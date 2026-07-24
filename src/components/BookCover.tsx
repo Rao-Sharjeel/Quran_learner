@@ -1,5 +1,6 @@
 import type { LibraryResource } from '../types'
 import { LIBRARY_KIND_LABELS } from '../types'
+import { assetUrl } from '../lib/assets'
 
 type CoverResource = Pick<
   LibraryResource,
@@ -23,7 +24,7 @@ export function BookCover({
     return (
       <span className={`relative isolate block overflow-hidden bg-brand-800 ${className}`}>
         <img
-          src={resource.coverImage}
+          src={assetUrl(resource.coverImage)}
           alt=""
           className="block h-full w-full object-cover"
           loading="lazy"
