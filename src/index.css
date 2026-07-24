@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+@theme {
+  /* Product UI: geometric sans everywhere — Amiri only for Arabic */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Amiri", "Traditional Arabic", serif;
+
+  /* Soft limestone light — pine greens a step lighter */
+  --color-brand-50: #eaf5f0;
+  --color-brand-100: #d4ebe1;
+  --color-brand-200: #aed9c4;
+  --color-brand-500: #1f8f6a;
+  --color-brand-600: #1a7a5c;
+  --color-brand-700: #176b50;
+  --color-brand-800: #145a44;
+  --color-ink: #1a221c;
+  --color-muted: #5a675f;
+  --color-line: #d5ddd7;
+  --color-surface: #dde5e0;
+  --color-canvas: #eef1ed;
+  --color-brass: #b8922a;
+  --color-brass-soft: #ebe0c0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Soft limestone panels — slightly lifted from the page ground */
+.panel {
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.2)),
+    var(--color-canvas);
+  box-shadow:
+    0 1px 2px rgb(26 34 28 / 0.06),
+    0 12px 28px rgb(26 34 28 / 0.07);
+  outline: 1px solid var(--color-line);
+}
+
+/*
+  App ground: pine wash + paper grain + soft lattice.
+  Light theme, intentionally quieter than pure white.
+*/
+.app-mesh {
+  background-color: var(--color-surface);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 6% -6%, rgb(23 107 80 / 0.18), transparent 58%),
+    radial-gradient(ellipse 60% 45% at 100% 0%, rgb(184 146 42 / 0.12), transparent 52%),
+    radial-gradient(ellipse 80% 55% at 50% 120%, rgb(23 107 80 / 0.1), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cpath fill='none' stroke='%23176b50' stroke-opacity='0.07' stroke-width='1' d='M0 48h96M48 0v96M0 0l96 96M96 0L0 96'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.14 0 0 0 0 0.1 0 0 0 0.45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:
+    auto,
+    auto,
+    auto,
+    96px 96px,
+    160px 160px;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.45s ease-out both;
+}
+
+.animate-rise-delay-1 {
+  animation: rise-in 0.45s ease-out 0.06s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise-in 0.45s ease-out 0.12s both;
+}
+
+.animate-fade {
+  animation: fade-in 0.55s ease-out both;
+}
+
+/* Standing book on a shelf — depth without looking like a blog card */
+.shelf-book {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.25s ease, filter 0.25s ease;
+  filter: drop-shadow(0 10px 14px rgb(26 34 28 / 0.18));
+}
+
+.shelf-book:hover {
+  transform: translateY(-8px) rotateY(-6deg);
+  filter: drop-shadow(0 16px 20px rgb(26 34 28 / 0.28));
+}
+
+.shelf-book__face {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 2px 6px 6px 2px;
+  box-shadow:
+    inset 3px 0 0 rgb(255 255 255 / 0.12),
+    inset -1px 0 0 rgb(0 0 0 / 0.25);
+}
+
+.shelf-book__pages {
+  position: absolute;
+  top: 3%;
+  right: -5px;
+  bottom: 3%;
+  z-index: 1;
+  width: 7px;
+  border-radius: 0 2px 2px 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      #f7f4ec 0 1.5px,
+      #d9d2c2 1.5px 2px
+    );
+  box-shadow: 1px 0 2px rgb(26 34 28 / 0.15);
+}
+
+.shelf-book__spine {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 3;
+  width: 10px;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.35),
+    rgb(255 255 255 / 0.1) 40%,
+    rgb(0 0 0 / 0.2)
+  );
+  pointer-events: none;
+}
+
+.bookshelf {
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(180deg, transparent 0 88%, rgb(26 34 28 / 0.06) 88% 92%, transparent 92%),
+    linear-gradient(180deg, rgb(238 241 237 / 0.4), rgb(221 229 224 / 0.55));
+  outline: 1px solid var(--color-line);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
+}
+
+.bookshelf__plank {
+  height: 10px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, #c4b496, #a8906a 45%, #8f7854);
+  box-shadow:
+    0 2px 4px rgb(26 34 28 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+
+/* Home reading shelf — warm wood alcove behind the books */
+.reading-shelf {
+  background-color: #d9cbb4;
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent 35%),
+    linear-gradient(90deg, rgb(110 88 58 / 0.14), transparent 12%, transparent 88%, rgb(110 88 58 / 0.14)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 11px,
+      rgb(120 96 64 / 0.06) 11px 12px
+    ),
+    linear-gradient(165deg, #e6dac6 0%, #d2c2a8 48%, #c4b292 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -10px 18px rgb(90 70 40 / 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-book,
+  .shelf-book:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.login-pattern {
+  background-color: var(--color-brand-800);
+  background-image:
+    radial-gradient(ellipse 90% 70% at 15% 15%, rgb(26 122 92 / 0.4), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 95% 85%, rgb(184 146 42 / 0.22), transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-opacity='0.07' stroke-width='1' d='M0 40h80M40 0v80M0 0l80 80M80 0L0 80'/%3E%3C/svg%3E"),
+    linear-gradient(160deg, #145a44 0%, #176b50 48%, #145a44 100%);
+  background-size: auto, auto, 80px 80px, auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rise-delay-1,
+  .animate-rise-delay-2,
+  .animate-fade {
+    animation: none;
+  }
+}
