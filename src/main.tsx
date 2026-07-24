@@ -6,7 +6,7 @@ import './index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/Quran">
+    <BrowserRouter basename="/Quran_learner">
       <App />
     </BrowserRouter>
   </StrictMode>,
