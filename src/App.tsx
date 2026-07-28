@@ -1,13 +1,18 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams, useLocation } from 'react-router-dom'
 import { StudentLayout } from './layouts/StudentLayout'
+import { TeacherLayout } from './layouts/TeacherLayout'
 import { AskListPage } from './pages/AskListPage'
 import { AskNewPage } from './pages/AskNewPage'
 import { AskScholarRoomPage } from './pages/AskScholarRoomPage'
 import { AskThreadPage } from './pages/AskThreadPage'
 import { BookSessionPage } from './pages/BookSessionPage'
+import { BillingPage } from './pages/BillingPage'
+import { CheckoutPage, PayEngagementRedirect } from './pages/CheckoutPage'
 import { ClassroomRoomPage } from './pages/ClassroomRoomPage'
 import { JoinSessionPage } from './pages/JoinSessionPage'
 import { HomeworkAudioPage } from './pages/HomeworkAudioPage'
+import { HomeworkPage } from './pages/HomeworkPage'
+import { InvoiceDetailPage } from './pages/InvoiceDetailPage'
 import { KidEditPage } from './pages/KidEditPage'
 import { KidHubPage } from './pages/KidHubPage'
 import { KidNewPage } from './pages/KidNewPage'
@@ -20,26 +25,58 @@ import { SessionsPage } from './pages/SessionsPage'
 import { StudentHomePage } from './pages/StudentHomePage'
 import { TeacherProfilePage } from './pages/TeacherProfilePage'
 import { TeachersPage } from './pages/TeachersPage'
+import { TeacherHomePage } from './pages/teacher/TeacherHomePage'
+import { TeacherRequestsPage } from './pages/teacher/TeacherRequestsPage'
+import { TeacherSessionDetailPage } from './pages/teacher/TeacherSessionDetailPage'
+
+function TeachersToLearnRedirect() {
+  const { id } = useParams()
+  const location = useLocation()
+  return <Navigate to={`/learn/${id}${location.search}`} replace />
+}
+
+function TeachersBookToHireRedirect() {
+  const { id } = useParams()
+  const location = useLocation()
+  return <Navigate to={`/learn/${id}/hire${location.search}`} replace />
+}
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
+
       <Route path="/sessions/:id/room" element={<ClassroomRoomPage />} />
+      <Route path="/teacher/sessions/:id/room" element={<ClassroomRoomPage />} />
+
+      <Route element={<TeacherLayout />}>
+        <Route path="/teacher" element={<TeacherHomePage />} />
+        <Route path="/teacher/requests" element={<TeacherRequestsPage />} />
+        <Route path="/teacher/sessions/:id" element={<TeacherSessionDetailPage />} />
+      </Route>
+
       <Route element={<StudentLayout />}>
         <Route path="/app" element={<StudentHomePage />} />
         <Route path="/kids" element={<KidsPage />} />
         <Route path="/kids/new" element={<KidNewPage />} />
         <Route path="/kids/:id" element={<KidHubPage />} />
         <Route path="/kids/:id/edit" element={<KidEditPage />} />
-        <Route path="/teachers" element={<TeachersPage />} />
-        <Route path="/teachers/:id" element={<TeacherProfilePage />} />
-        <Route path="/teachers/:id/book" element={<BookSessionPage />} />
+        <Route path="/learn" element={<TeachersPage />} />
+        <Route path="/learn/:id" element={<TeacherProfilePage />} />
+        <Route path="/learn/:id/hire" element={<BookSessionPage />} />
+        <Route path="/teachers" element={<Navigate to="/learn" replace />} />
+        <Route path="/teachers/:id" element={<TeachersToLearnRedirect />} />
+        <Route path="/teachers/:id/book" element={<TeachersBookToHireRedirect />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/sessions/join" element={<JoinSessionPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
         <Route path="/sessions/:id/homework/:hwId" element={<HomeworkAudioPage />} />
+        <Route path="/engagements/:id/checkout" element={<CheckoutPage />} />
+        <Route path="/engagements/:id/pay" element={<PayEngagementRedirect />} />
+        <Route path="/billing" element={<BillingPage />} />
+        <Route path="/billing/invoices/:id" element={<InvoiceDetailPage />} />
+        <Route path="/homework" element={<HomeworkPage />} />
         <Route path="/ask" element={<AskListPage />} />
         <Route path="/ask/new" element={<AskNewPage />} />
         <Route path="/ask/:id" element={<AskThreadPage />} />

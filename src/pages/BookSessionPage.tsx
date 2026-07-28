@@ -1,9 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { createBookingRequest, getTeacher, useLearners } from '../mocks/store'
-import { SUBJECT_LABELS, type SubjectId } from '../types'
+import {
+  createEngagementRequest,
+  getGuardian,
+  getTeacher,
+  hadFreeIntro,
+  useLearners,
+} from '../mocks/store'
+import {
+  INTRO_DURATION_MINUTES,
+  PACKAGE_SESSION_COUNT,
+  SUBJECT_LABELS,
+  WEEKDAY_LABELS,
+  type SubjectId,
+} from '../types'
 import { Button, ButtonLink } from '../components/Button'
-import { LearnerPicker } from '../components/LearnerPicker'
+import { MultiLearnerPicker } from '../components/MultiLearnerPicker'
 
 const fieldClass =
   'w-full rounded-2xl bg-surface px-3.5 py-2.5 text-sm outline-none ring-1 ring-line transition focus:bg-canvas focus:ring-2 focus:ring-brand-500/30'
@@ -15,149 +27,191 @@ export function BookSessionPage() {
   const teacher = id ? getTeacher(id) : undefined
   const learners = useLearners()
   const preselect = search.get('for')
-  const defaultLearner =
-    (preselect && learners.some((l) => l.id === preselect) && preselect) ||
-    learners.find((l) => l.kind === 'self')?.id ||
-    learners[0]?.id ||
-    ''
+  const defaultLearners = useMemo(() => {
+    if (preselect && learners.some((l) => l.id === preselect)) return [preselect]
+    const self = learners.find((l) => l.kind === 'self')
+    return self ? [self.id] : []
+  }, [learners, preselect])
 
-  const [learnerId, setLearnerId] = useState(defaultLearner)
-  const [slotId, setSlotId] = useState(teacher?.availability[0]?.id ?? '')
+  const [learnerIds, setLearnerIds] = useState<string[]>(defaultLearners)
+  const [slotIds, setSlotIds] = useState<string[]>([])
   const [subject, setSubject] = useState<SubjectId>(teacher?.subjects[0] ?? 'quran_reading')
+  const [titleSuggestion, setTitleSuggestion] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
-
-  const selectedSlot = useMemo(
-    () => teacher?.availability.find((s) => s.id === slotId),
-    [teacher, slotId],
-  )
 
   if (!teacher) {
     return (
       <div className="panel p-8 text-center">
         <p className="font-semibold">Teacher not found</p>
-        <ButtonLink to="/teachers" variant="secondary" className="mt-4">
-          Back to directory
+        <ButtonLink to="/learn" variant="secondary" className="mt-4">
+          Back to Learn
         </ButtonLink>
       </div>
     )
   }
 
-  const selectedTeacher = teacher
+  const introAvailable = !hadFreeIntro(getGuardian().id, teacher.id)
+  const slotsSorted = [...teacher.availability].sort((a, b) => a.weekday - b.weekday)
+
+  function toggleSlot(slotId: string) {
+    setSlotIds((prev) =>
+      prev.includes(slotId) ? prev.filter((x) => x !== slotId) : [...prev, slotId],
+    )
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    if (!learnerId) {
-      setError('Choose who this session is for.')
-      return
-    }
     try {
-      const session = createBookingRequest({
-        teacherId: selectedTeacher.id,
-        slotId,
+      const engagement = createEngagementRequest({
+        teacherId: teacher!.id,
+        weeklySlotIds: slotIds,
         subject,
+        learnerIds,
+        titleSuggestion,
         studentNote: note,
-        learnerId,
       })
-      navigate(`/sessions/${session.id}`, {
-        state: { justBooked: true },
+      navigate('/sessions', {
+        state: { justRequested: engagement.id },
       })
-    } catch {
-      setError('Could not create booking. Pick another slot or learner.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send request')
     }
   }
 
   return (
     <div className="mx-auto max-w-xl space-y-6 animate-rise">
       <Link
-        to={`/teachers/${teacher.id}`}
-        className="text-sm font-medium text-brand-700 transition hover:text-brand-800"
+        to={`/learn/${teacher.id}`}
+        className="text-sm font-medium text-brand-700 hover:text-brand-800"
       >
         ← {teacher.name}
       </Link>
 
-      <div className="panel p-6 md:p-8">
+      <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-ink">
-          Request a session
+          Request sessions
         </h1>
         <p className="mt-2 text-muted">
-          Choose who the lesson is for, then pick a slot. You’ll see status under Sessions once
-          they respond.
+          ${teacher.rateUsd}/session · {teacher.durationMinutes} min regular ·{' '}
+          {introAvailable
+            ? `free ${INTRO_DURATION_MINUTES}-min intro first`
+            : 'no free intro (you’ve studied with this teacher before)'}
         </p>
-
-        <form onSubmit={onSubmit} className="mt-8 space-y-5">
-          <LearnerPicker value={learnerId} onChange={setLearnerId} />
-
-          <label className="block space-y-1.5 text-sm">
-            <span className="font-medium text-ink">Subject</span>
-            <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value as SubjectId)}
-              className={fieldClass}
-            >
-              {teacher.subjects.map((s) => (
-                <option key={s} value={s}>
-                  {SUBJECT_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-ink">Available slot</legend>
-            <div className="space-y-2">
-              {teacher.availability.map((slot) => (
-                <label
-                  key={slot.id}
-                  className={[
-                    'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-sm transition',
-                    slotId === slot.id
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-line hover:border-brand-200',
-                  ].join(' ')}
-                >
-                  <input
-                    type="radio"
-                    name="slot"
-                    checked={slotId === slot.id}
-                    onChange={() => setSlotId(slot.id)}
-                    className="accent-brand-700"
-                  />
-                  {slot.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <label className="block space-y-1.5 text-sm">
-            <span className="font-medium text-ink">Note to teacher (optional)</span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              placeholder="e.g. I want help with Surah Al-Mulk tajweed"
-              className={`${fieldClass} resize-y`}
-            />
-          </label>
-
-          {selectedSlot ? (
-            <p className="rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
-              Requesting <strong>{selectedSlot.label}</strong> · ${teacher.rateUsd}/hr
-            </p>
-          ) : null}
-
-          {error ? (
-            <p className="text-sm text-red-700" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <Button type="submit" className="w-full" disabled={!learnerId}>
-            Send booking request
-          </Button>
-        </form>
       </div>
+
+      <form onSubmit={onSubmit} className="panel space-y-5 p-6">
+        <div>
+          <label className="text-sm font-semibold text-ink">Learners</label>
+          <p className="mt-0.5 text-xs text-muted">
+            Everyone joins from the same device in one class.
+          </p>
+          <div className="mt-2">
+            <MultiLearnerPicker value={learnerIds} onChange={setLearnerIds} />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-ink" htmlFor="subject">
+            Subject
+          </label>
+          <select
+            id="subject"
+            className={`${fieldClass} mt-1.5`}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value as SubjectId)}
+          >
+            {teacher.subjects.map((s) => (
+              <option key={s} value={s}>
+                {SUBJECT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-ink">Weekly times</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Select one or more recurring spots. After payment, at least{' '}
+            {PACKAGE_SESSION_COUNT} sessions are scheduled across these times.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {slotsSorted.map((slot) => {
+              const active = slotIds.includes(slot.id)
+              return (
+                <li key={slot.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSlot(slot.id)}
+                    className={[
+                      'flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition',
+                      active
+                        ? 'border-brand-500 bg-brand-50 text-brand-900'
+                        : 'border-line hover:border-brand-200',
+                    ].join(' ')}
+                  >
+                    <span>
+                      <span className="font-semibold">
+                        {WEEKDAY_LABELS[slot.weekday]}
+                      </span>{' '}
+                      {slot.label.replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s/, '')}
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted">
+                      {active ? 'Selected' : 'Select'}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-ink" htmlFor="title">
+            Session topic (optional)
+          </label>
+          <input
+            id="title"
+            className={`${fieldClass} mt-1.5`}
+            value={titleSuggestion}
+            onChange={(e) => setTitleSuggestion(e.target.value)}
+            placeholder="e.g. Madd rules in Juz Amma"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-ink" htmlFor="note">
+            Note to teacher (optional)
+          </label>
+          <textarea
+            id="note"
+            rows={3}
+            className={`${fieldClass} mt-1.5`}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        <div className="rounded-xl bg-canvas px-3 py-3 text-sm text-muted ring-1 ring-line">
+          <p>
+            After accept:{' '}
+            {introAvailable
+              ? `free intro → then pay for at least ${PACKAGE_SESSION_COUNT} sessions (from $${teacher.rateUsd * PACKAGE_SESSION_COUNT}).`
+              : `pay for at least ${PACKAGE_SESSION_COUNT} sessions (from $${teacher.rateUsd * PACKAGE_SESSION_COUNT}) — no free intro.`}
+          </p>
+        </div>
+
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={learnerIds.length === 0 || slotIds.length === 0}
+        >
+          Send request
+        </Button>
+      </form>
     </div>
   )
 }

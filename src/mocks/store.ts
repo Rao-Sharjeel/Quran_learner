@@ -1,13 +1,22 @@
 import { useSyncExternalStore } from 'react'
 import type {
+  AppNotification,
   AskQuestion,
+  Course,
   HomeworkAudioComment,
   HomeworkItem,
+  Invoice,
   LearnerProfile,
   LibraryResource,
   ReadingBookmark,
   Session,
   SubjectId,
+  TeachingEngagement,
+} from '../types'
+import {
+  INTRO_DURATION_MINUTES,
+  PACKAGE_SESSION_COUNT,
+  SUBJECT_LABELS,
 } from '../types'
 import {
   currentGuardian,
@@ -15,22 +24,47 @@ import {
   learnerInitials,
   nextLearnerColor,
   seedAskQuestions,
+  seedCourses,
+  seedEngagements,
+  seedInvoices,
   seedLearners,
   seedReadingBookmarks,
   seedSessions,
   teacherReviews,
   teachers,
 } from './data'
+import {
+  buildIntroSession,
+  buildRegularCalendar,
+  hadFreeIntroForPair,
+  slotsForEngagement,
+} from './engagementHelpers'
+import { nextOccurrence } from '../lib/schedule'
 import { seedLibrary } from './library'
 
 type Listener = () => void
 
-let sessions: Session[] = [...seedSessions]
+let sessions: Session[] = structuredClone(seedSessions)
+let engagements: TeachingEngagement[] = structuredClone(seedEngagements)
+let invoices: Invoice[] = structuredClone(seedInvoices)
 let askQuestions: AskQuestion[] = structuredClone(seedAskQuestions)
 let learners: LearnerProfile[] = structuredClone(seedLearners)
 let readingBookmarks: ReadingBookmark[] = structuredClone(seedReadingBookmarks)
+let notifications: AppNotification[] = [
+  {
+    id: 'ntf_seed_1',
+    kind: 'payment_due',
+    title: 'Payment pending',
+    body: 'Introductory session with Ustadha Fatima Noor is done. Pay for at least 4 sessions to continue.',
+    createdAt: '2026-07-20T19:00:00.000Z',
+    read: false,
+    href: '/engagements/eng_3/checkout',
+  },
+]
 /** Demo: which forum scholar is acting in private rooms */
 let activeScholarId = 'tch_1'
+/** Demo teacher portal actor */
+let activeTeacherId = 'tch_1'
 
 const listeners = new Set<Listener>()
 
@@ -45,6 +79,18 @@ function subscribe(listener: Listener) {
 
 function getSessionsSnapshot() {
   return sessions
+}
+
+function getEngagementsSnapshot() {
+  return engagements
+}
+
+function getInvoicesSnapshot() {
+  return invoices
+}
+
+function getNotificationsSnapshot() {
+  return notifications
 }
 
 function getAskQuestions() {
@@ -63,11 +109,35 @@ function getActiveScholarId() {
   return activeScholarId
 }
 
+function getActiveTeacherId() {
+  return activeTeacherId
+}
+
+export function sessionIncludesLearner(session: Session, learnerId: string) {
+  return session.learnerIds.includes(learnerId)
+}
+
 export function useSessions(filter?: { learnerId?: string | null }) {
   const all = useSyncExternalStore(subscribe, getSessionsSnapshot, getSessionsSnapshot)
   if (filter?.learnerId === undefined) return all
   if (!filter.learnerId) return []
-  return all.filter((s) => s.learnerId === filter.learnerId)
+  return all.filter((s) => sessionIncludesLearner(s, filter.learnerId!))
+}
+
+export function useEngagements() {
+  return useSyncExternalStore(subscribe, getEngagementsSnapshot, getEngagementsSnapshot)
+}
+
+export function useInvoices() {
+  return useSyncExternalStore(subscribe, getInvoicesSnapshot, getInvoicesSnapshot)
+}
+
+export function useNotifications() {
+  return useSyncExternalStore(
+    subscribe,
+    getNotificationsSnapshot,
+    getNotificationsSnapshot,
+  )
 }
 
 export function useAskQuestions() {
@@ -101,12 +171,30 @@ export function useActiveScholarId() {
   return useSyncExternalStore(subscribe, getActiveScholarId, getActiveScholarId)
 }
 
+export function useActiveTeacherId() {
+  return useSyncExternalStore(subscribe, getActiveTeacherId, getActiveTeacherId)
+}
+
+export function setActiveTeacher(teacherId: string) {
+  if (!teachers.some((t) => t.id === teacherId)) throw new Error('Teacher not found')
+  activeTeacherId = teacherId
+  emit()
+}
+
 export function getTeacher(id: string) {
   return teachers.find((t) => t.id === id)
 }
 
 export function listTeachers() {
   return teachers
+}
+
+export function listCourses() {
+  return seedCourses
+}
+
+export function getCourse(id: string): Course | undefined {
+  return seedCourses.find((c) => c.id === id)
 }
 
 export function listForumScholars() {
@@ -200,13 +288,15 @@ export function removeKid(id: string): { ok: true } | { ok: false; reason: strin
 
   const blocking = sessions.some(
     (s) =>
-      s.learnerId === id && (s.status === 'pending' || s.status === 'accepted'),
+      sessionIncludesLearner(s, id) &&
+      s.status === 'scheduled' &&
+      (s.paymentStatus === 'paid' || s.paymentStatus === 'free'),
   )
   if (blocking) {
     return {
       ok: false,
       reason:
-        'This kid has upcoming or pending sessions. Cancel or complete them before removing.',
+        'This kid has upcoming paid or intro sessions. End those engagements or wait until they complete before removing.',
     }
   }
 
@@ -301,6 +391,14 @@ export function getSession(id: string) {
   return sessions.find((s) => s.id === id)
 }
 
+export function getEngagement(id: string) {
+  return engagements.find((e) => e.id === id)
+}
+
+export function listEngagements() {
+  return engagements
+}
+
 export function getAskQuestion(id: string) {
   return askQuestions.find((q) => q.id === id)
 }
@@ -317,42 +415,538 @@ export function setActiveScholar(scholarId: string) {
   emit()
 }
 
-export function createBookingRequest(input: {
+function pushNotification(
+  n: Omit<AppNotification, 'id' | 'createdAt' | 'read'> & { id?: string },
+) {
+  notifications = [
+    {
+      id: n.id ?? `ntf_${Date.now()}`,
+      kind: n.kind,
+      title: n.title,
+      body: n.body,
+      href: n.href,
+      createdAt: new Date().toISOString(),
+      read: false,
+    },
+    ...notifications,
+  ]
+}
+
+export function markNotificationRead(id: string) {
+  notifications = notifications.map((n) =>
+    n.id === id ? { ...n, read: true } : n,
+  )
+  emit()
+}
+
+export function hadFreeIntro(guardianId: string, teacherId: string) {
+  return hadFreeIntroForPair(engagements, guardianId, teacherId)
+}
+
+export function createEngagementRequest(input: {
   teacherId: string
-  slotId: string
+  weeklySlotIds: string[]
   subject: SubjectId
+  learnerIds: string[]
+  titleSuggestion?: string
   studentNote?: string
-  learnerId: string
 }) {
   const teacher = getTeacher(input.teacherId)
   if (!teacher) throw new Error('Teacher not found')
-  const slot = teacher.availability.find((s) => s.id === input.slotId)
-  if (!slot) throw new Error('Slot not found')
-
-  if (!learners.some((l) => l.id === input.learnerId)) {
-    throw new Error('Select who this session is for')
+  if (!teacher.subjects.includes(input.subject)) {
+    throw new Error('Subject not offered by this teacher')
+  }
+  if (input.weeklySlotIds.length === 0) {
+    throw new Error('Select at least one weekly time')
+  }
+  for (const slotId of input.weeklySlotIds) {
+    if (!teacher.availability.some((s) => s.id === slotId)) {
+      throw new Error('Invalid weekly slot')
+    }
+  }
+  if (input.learnerIds.length === 0) {
+    throw new Error('Select at least one learner')
+  }
+  for (const lid of input.learnerIds) {
+    if (!learners.some((l) => l.id === lid)) throw new Error('Invalid learner')
   }
 
-  const session: Session = {
-    id: `ses_${Date.now()}`,
-    learnerId: input.learnerId,
+  const introUsed = hadFreeIntro(currentGuardian.id, teacher.id)
+  const engagement: TeachingEngagement = {
+    id: `eng_${Date.now()}`,
+    guardianId: currentGuardian.id,
     teacherId: teacher.id,
-    slotLabel: slot.label,
-    startsAt: slot.startsAt,
-    status: 'pending',
     subject: input.subject,
+    learnerIds: [...input.learnerIds],
+    weeklySlotIds: [...input.weeklySlotIds],
+    status: 'pending',
+    titleSuggestion: input.titleSuggestion?.trim() || undefined,
     studentNote: input.studentNote?.trim() || undefined,
+    introUsed,
+    prepaidSessionCredits: 0,
+    createdAt: new Date().toISOString(),
   }
-  sessions = [session, ...sessions]
+  engagements = [engagement, ...engagements]
   emit()
-  return session
+  return engagement
+}
+
+export function teacherAcceptEngagement(engagementId: string) {
+  const engagement = getEngagement(engagementId)
+  if (!engagement || engagement.status !== 'pending') {
+    throw new Error('Request not pending')
+  }
+  const teacher = getTeacher(engagement.teacherId)
+  if (!teacher) throw new Error('Teacher not found')
+
+  const slots = slotsForEngagement(teacher, engagement)
+  const firstSlot = slots[0] ?? teacher.availability[0]
+  if (!firstSlot) throw new Error('No availability')
+
+  const introStarts = nextOccurrence(firstSlot, new Date())
+  // Prefer soon intro: if first weekly slot is far, still use nextOccurrence
+
+  if (!engagement.introUsed) {
+    const intro = buildIntroSession({
+      engagement,
+      teacher,
+      startsAt: introStarts,
+    })
+    sessions = [intro, ...sessions]
+    engagements = engagements.map((e) =>
+      e.id === engagementId
+        ? { ...e, status: 'intro_scheduled' as const, introUsed: true }
+        : e,
+    )
+    pushNotification({
+      kind: 'engagement_accepted',
+      title: 'Teacher accepted your request',
+      body: `${teacher.name} scheduled a free introductory session (${INTRO_DURATION_MINUTES} min).`,
+      href: `/sessions/${intro.id}`,
+    })
+  } else {
+    // Restart — no free intro; go straight to awaiting payment
+    engagements = engagements.map((e) =>
+      e.id === engagementId
+        ? { ...e, status: 'awaiting_payment' as const, introUsed: true }
+        : e,
+    )
+    pushNotification({
+      kind: 'payment_due',
+      title: 'Teacher accepted — payment required',
+      body: `${teacher.name} accepted. Pay for at least ${PACKAGE_SESSION_COUNT} sessions to start (no free intro on restart).`,
+      href: `/engagements/${engagementId}/checkout`,
+    })
+  }
+  emit()
+  return getEngagement(engagementId)!
+}
+
+export function teacherDeclineEngagement(engagementId: string, message?: string) {
+  const engagement = getEngagement(engagementId)
+  if (!engagement || engagement.status !== 'pending') {
+    throw new Error('Request not pending')
+  }
+  engagements = engagements.map((e) =>
+    e.id === engagementId
+      ? {
+          ...e,
+          status: 'declined' as const,
+          teacherMessage: message?.trim() || e.teacherMessage,
+        }
+      : e,
+  )
+  emit()
+}
+
+export function teacherRescheduleMessage(engagementId: string, message: string) {
+  const text = message.trim()
+  if (!text) throw new Error('Write a message')
+  const engagement = getEngagement(engagementId)
+  if (!engagement || engagement.status !== 'pending') {
+    throw new Error('Request not pending')
+  }
+  engagements = engagements.map((e) =>
+    e.id === engagementId ? { ...e, teacherMessage: text } : e,
+  )
+  emit()
+}
+
+/** Mark intro complete → awaiting payment (or activate if somehow already paid). */
+export function completeIntro(sessionId: string) {
+  const session = getSession(sessionId)
+  if (!session || session.kind !== 'intro') throw new Error('Not an intro session')
+  sessions = sessions.map((s) =>
+    s.id === sessionId ? { ...s, status: 'completed' as const } : s,
+  )
+  const eng = getEngagement(session.engagementId)
+  if (eng && (eng.status === 'intro_scheduled' || eng.status === 'pending')) {
+    engagements = engagements.map((e) =>
+      e.id === eng.id ? { ...e, status: 'awaiting_payment' as const } : e,
+    )
+    const teacher = getTeacher(eng.teacherId)
+    pushNotification({
+      kind: 'payment_due',
+      title: 'Payment pending',
+      body: `Intro with ${teacher?.name ?? 'your teacher'} is done. Pay for at least ${PACKAGE_SESSION_COUNT} sessions to continue.`,
+      href: `/engagements/${eng.id}/checkout`,
+    })
+  }
+  emit()
+}
+
+export function payPackage(engagementId: string, count = PACKAGE_SESSION_COUNT) {
+  const engagement = getEngagement(engagementId)
+  if (!engagement) throw new Error('Engagement not found')
+  if (
+    engagement.status !== 'awaiting_payment' &&
+    engagement.status !== 'active' &&
+    engagement.status !== 'intro_scheduled'
+  ) {
+    throw new Error('Nothing to pay for on this engagement')
+  }
+  const teacher = getTeacher(engagement.teacherId)
+  if (!teacher) throw new Error('Teacher not found')
+
+  const wasHiring =
+    engagement.status === 'awaiting_payment' ||
+    engagement.status === 'intro_scheduled'
+
+  const paidCredits = Math.max(PACKAGE_SESSION_COUNT, Math.floor(count))
+
+  const unpaid = sessions
+    .filter(
+      (s) =>
+        s.engagementId === engagementId &&
+        s.status === 'scheduled' &&
+        s.kind === 'regular' &&
+        (s.paymentStatus === 'unpaid' || s.paymentStatus === 'pending_payment'),
+    )
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+
+  let remaining = paidCredits
+  const markIds = new Set<string>()
+  for (const s of unpaid) {
+    if (remaining <= 0) break
+    markIds.add(s.id)
+    remaining -= 1
+  }
+
+  if (markIds.size > 0) {
+    sessions = sessions.map((s) =>
+      markIds.has(s.id) ? { ...s, paymentStatus: 'paid' as const } : s,
+    )
+  }
+
+  if (remaining > 0) {
+    const from = new Date()
+    const existingStarts = new Set(
+      sessions
+        .filter((s) => s.engagementId === engagementId && s.status !== 'cancelled')
+        .map((s) => s.startsAt),
+    )
+    const generated = buildRegularCalendar({
+      engagement,
+      teacher,
+      from,
+      paidCount: remaining + 8,
+      titleBase: engagement.titleSuggestion ?? SUBJECT_LABELS[engagement.subject],
+    }).filter((s) => !existingStarts.has(s.startsAt))
+
+    const paidNew = generated.slice(0, remaining).map((s) => ({
+      ...s,
+      paymentStatus: 'paid' as const,
+    }))
+    const unpaidNew = generated.slice(remaining).map((s) => ({
+      ...s,
+      paymentStatus: 'unpaid' as const,
+    }))
+    sessions = [...paidNew, ...unpaidNew, ...sessions]
+  }
+
+  engagements = engagements.map((e) =>
+    e.id === engagementId
+      ? {
+          ...e,
+          status: 'active' as const,
+          prepaidSessionCredits: e.prepaidSessionCredits + paidCredits,
+        }
+      : e,
+  )
+
+  if (wasHiring) {
+    notifications = notifications.map((n) =>
+      n.kind === 'payment_due' && n.href?.includes(engagementId)
+        ? { ...n, read: true }
+        : n,
+    )
+    pushNotification({
+      kind: 'hire_success',
+      title: 'Teacher hired',
+      body: `You’ve hired ${teacher.name}. Happy learning!`,
+      href: '/sessions',
+    })
+  }
+
+  emit()
+  return getEngagement(engagementId)!
+}
+
+export function getInvoice(id: string) {
+  return invoices.find((i) => i.id === id)
+}
+
+export function listInvoices() {
+  return invoices
+}
+
+export function useInvoice(id: string | undefined) {
+  const all = useInvoices()
+  if (!id) return undefined
+  return all.find((i) => i.id === id)
+}
+
+function nextInvoiceNumber() {
+  const nums = invoices
+    .map((i) => Number(i.invoiceNumber.replace(/\D/g, '')))
+    .filter((n) => !Number.isNaN(n))
+  const next = (nums.length ? Math.max(...nums) : 1000) + 1
+  return `INV-${next}`
+}
+
+export function buildInvoicePreview(
+  engagementId: string,
+  sessionCount: number,
+): Omit<Invoice, 'id' | 'createdAt' | 'invoiceNumber' | 'status' | 'paidAt'> {
+  const count = Math.max(PACKAGE_SESSION_COUNT, Math.floor(sessionCount))
+  const engagement = getEngagement(engagementId)
+  if (!engagement) throw new Error('Engagement not found')
+  const teacher = getTeacher(engagement.teacherId)
+  if (!teacher) throw new Error('Teacher not found')
+
+  const unit = teacher.rateUsd
+  const lines = [
+    {
+      description: `${SUBJECT_LABELS[engagement.subject]} sessions with ${teacher.name}`,
+      quantity: count,
+      unitAmountUsd: unit,
+    },
+  ]
+  const subtotalUsd = unit * count
+  return {
+    engagementId,
+    teacherId: teacher.id,
+    sessionCount: count,
+    lines,
+    subtotalUsd,
+    totalUsd: subtotalUsd,
+    currency: 'USD' as const,
+  }
+}
+
+/** Create or refresh an open invoice for checkout (qty >= 4). */
+export function createInvoice(engagementId: string, sessionCount: number) {
+  const count = Math.max(PACKAGE_SESSION_COUNT, Math.floor(sessionCount))
+  const preview = buildInvoicePreview(engagementId, count)
+
+  const existingOpen = invoices.find(
+    (i) => i.engagementId === engagementId && i.status === 'open',
+  )
+  if (existingOpen) {
+    invoices = invoices.map((i) =>
+      i.id === existingOpen.id
+        ? {
+            ...i,
+            ...preview,
+            status: 'open' as const,
+          }
+        : i,
+    )
+    emit()
+    return getInvoice(existingOpen.id)!
+  }
+
+  const invoice: Invoice = {
+    id: `inv_${Date.now()}`,
+    ...preview,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+    invoiceNumber: nextInvoiceNumber(),
+  }
+  invoices = [invoice, ...invoices]
+  emit()
+  return invoice
+}
+
+export function payInvoice(invoiceId: string) {
+  const invoice = getInvoice(invoiceId)
+  if (!invoice) throw new Error('Invoice not found')
+  if (invoice.status === 'paid') return invoice
+  if (invoice.status !== 'open' && invoice.status !== 'draft') {
+    throw new Error('Invoice cannot be paid')
+  }
+
+  payPackage(invoice.engagementId, invoice.sessionCount)
+
+  invoices = invoices.map((i) =>
+    i.id === invoiceId
+      ? { ...i, status: 'paid' as const, paidAt: new Date().toISOString() }
+      : i,
+  )
+  emit()
+  return getInvoice(invoiceId)!
+}
+
+export function endEngagement(engagementId: string) {
+  const engagement = getEngagement(engagementId)
+  if (!engagement) throw new Error('Engagement not found')
+  if (engagement.status === 'ended') return engagement
+
+  sessions = sessions.map((s) => {
+    if (s.engagementId !== engagementId) return s
+    if (s.status !== 'scheduled') return s
+    if (s.paymentStatus === 'paid' || s.paymentStatus === 'free') return s
+    return { ...s, status: 'cancelled' as const }
+  })
+
+  engagements = engagements.map((e) =>
+    e.id === engagementId
+      ? {
+          ...e,
+          status: 'ended' as const,
+          endedAt: new Date().toISOString(),
+        }
+      : e,
+  )
+  emit()
+  return getEngagement(engagementId)!
+}
+
+/** Guardian declines to hire after intro — cancels unpaid future sessions */
+export function markNotHired(engagementId: string) {
+  const engagement = getEngagement(engagementId)
+  if (!engagement) throw new Error('Engagement not found')
+  if (engagement.status === 'not_hired' || engagement.status === 'ended') {
+    return engagement
+  }
+
+  sessions = sessions.map((s) => {
+    if (s.engagementId !== engagementId) return s
+    if (s.status !== 'scheduled') return s
+    if (s.paymentStatus === 'paid' || s.paymentStatus === 'free') return s
+    return { ...s, status: 'cancelled' as const }
+  })
+
+  engagements = engagements.map((e) =>
+    e.id === engagementId
+      ? {
+          ...e,
+          status: 'not_hired' as const,
+          endedAt: new Date().toISOString(),
+        }
+      : e,
+  )
+  emit()
+  return getEngagement(engagementId)!
+}
+
+export function updateSessionTitle(sessionId: string, title: string) {
+  const text = title.trim()
+  if (!text) throw new Error('Title required')
+  sessions = sessions.map((s) => (s.id === sessionId ? { ...s, title: text } : s))
+  emit()
+}
+
+export function updateSessionNotes(
+  sessionId: string,
+  patch: {
+    sharedNotes?: string
+    privateNotesGuardian?: string
+    privateNotesTeacher?: string
+  },
+) {
+  sessions = sessions.map((s) => {
+    if (s.id !== sessionId) return s
+    return {
+      ...s,
+      sharedNotes:
+        patch.sharedNotes !== undefined ? patch.sharedNotes : s.sharedNotes,
+      privateNotesGuardian:
+        patch.privateNotesGuardian !== undefined
+          ? patch.privateNotesGuardian
+          : s.privateNotesGuardian,
+      privateNotesTeacher:
+        patch.privateNotesTeacher !== undefined
+          ? patch.privateNotesTeacher
+          : s.privateNotesTeacher,
+    }
+  })
+  emit()
+}
+
+export function assignHomework(
+  sessionId: string,
+  input: { learnerId: string; text: string; requiresAudio?: boolean },
+) {
+  const session = getSession(sessionId)
+  if (!session) throw new Error('Session not found')
+  if (!session.learnerIds.includes(input.learnerId)) {
+    throw new Error('Learner not on this session')
+  }
+  const text = input.text.trim()
+  if (!text) throw new Error('Homework text required')
+  const item: HomeworkItem = {
+    id: `hw_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    learnerId: input.learnerId,
+    text,
+    done: false,
+    requiresAudio: input.requiresAudio,
+  }
+  sessions = sessions.map((s) =>
+    s.id === sessionId
+      ? { ...s, homework: [...(s.homework ?? []), item] }
+      : s,
+  )
+  emit()
+  return item
+}
+
+export function setHomeworkMark(
+  sessionId: string,
+  homeworkId: string,
+  mark: number,
+) {
+  const value = Math.max(0, Math.min(10, Math.round(mark)))
+  patchHomework(sessionId, homeworkId, (h) => ({ ...h, mark: value }))
 }
 
 export function markSessionCompleted(id: string) {
+  const session = getSession(id)
   sessions = sessions.map((s) =>
     s.id === id ? { ...s, status: 'completed' as const } : s,
   )
+  if (session?.kind === 'intro') {
+    // Mirror completeIntro side effects without double-emit issues
+    const eng = getEngagement(session.engagementId)
+    if (eng && eng.status === 'intro_scheduled') {
+      engagements = engagements.map((e) =>
+        e.id === eng.id ? { ...e, status: 'awaiting_payment' as const } : e,
+      )
+      const teacher = getTeacher(eng.teacherId)
+      pushNotification({
+        kind: 'payment_due',
+        title: 'Payment pending',
+        body: `Intro with ${teacher?.name ?? 'your teacher'} is done. Pay for at least ${PACKAGE_SESSION_COUNT} sessions to continue.`,
+        href: `/engagements/${eng.id}/checkout`,
+      })
+    }
+  }
   emit()
+}
+
+/** @deprecated Use createEngagementRequest */
+export function createBookingRequest(_input: unknown): never {
+  throw new Error('Use createEngagementRequest — one-off booking is retired')
 }
 
 export function toggleHomeworkDone(sessionId: string, homeworkId: string) {
@@ -474,9 +1068,9 @@ export function useSession(id: string | undefined) {
 
 export function openHomeworkCount(learnerId: string) {
   return sessions
-    .filter((s) => s.learnerId === learnerId && s.homework)
+    .filter((s) => sessionIncludesLearner(s, learnerId) && s.homework)
     .flatMap((s) => s.homework ?? [])
-    .filter((h) => !h.done).length
+    .filter((h) => h.learnerId === learnerId && !h.done).length
 }
 
 export function underReviewAskCount(learnerId: string) {
@@ -485,10 +1079,28 @@ export function underReviewAskCount(learnerId: string) {
   ).length
 }
 
+/** Joinable: scheduled + (free or paid) — unpaid cannot join until paid */
 export function joinableSessions() {
   return sessions
-    .filter((s) => s.status === 'accepted')
+    .filter(
+      (s) =>
+        s.status === 'scheduled' &&
+        (s.paymentStatus === 'paid' || s.paymentStatus === 'free'),
+    )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+}
+
+export function previousCompletedSession(sessionId: string) {
+  const current = getSession(sessionId)
+  if (!current) return undefined
+  return sessions
+    .filter(
+      (s) =>
+        s.engagementId === current.engagementId &&
+        s.status === 'completed' &&
+        s.startsAt < current.startsAt,
+    )
+    .sort((a, b) => b.startsAt.localeCompare(a.startsAt))[0]
 }
 
 export function createAskQuestion(input: {

@@ -104,34 +104,43 @@ flowchart LR
 The logged-in account is an **adult guardian** who can **also learn as themselves**. Kids are additional learners. There is **no header “active kid” switcher** — the family is managed together. Choose who a booking / Ask / course is for **at action time**. When a class is starting, use the **join learner picker**.
 
 ### Side nav
-Home · Family · Teachers · Sessions · Ask Scholars · Courses · Progress · Homework · Practice · Library · Office hours · Premium
+Home · Family · **Learn** · **Sessions** · Billing · Ask Scholars · Courses · Progress · Homework · Practice · Library · Office hours · Premium
 
 ### Sitemap
 
 | Route | Screen |
 |-------|--------|
-| `/app` | Family home — you + kids progress; join-class picker when sessions are accepted |
+| `/app` | Family home — upcoming sessions, notifications |
 | `/kids` | Family manage — you + kids list / add / edit / remove |
 | `/kids/new` | Add kid |
 | `/kids/:id` | Learner hub (you or a kid) |
 | `/kids/:id/edit` | Edit kid |
-| `/teachers` | Directory (`?for=` optional preselect) |
-| `/teachers/:id` | Teacher profile |
-| `/teachers/:id/book` | Book 1:1 — **learner picker** (you or kid) required |
-| `/sessions` | All family sessions (filter chips by learner) |
-| `/sessions/join` | **Join picker** — whose accepted class to enter |
-| `/sessions/:id` | Detail |
-| `/sessions/:id/room` | Classroom |
+| `/learn` | Hire directory (subject filter; rate + duration) |
+| `/learn/:id` | Teacher profile + weekly availability |
+| `/learn/:id/hire` | Request: multi weekly slots, subject, multi learners |
+| `/sessions` | Timeline of hired teachers’ sessions (~2 months); End sessions; pay CTAs |
+| `/sessions/join` | Join picker — paid / free intro scheduled classes |
+| `/sessions/:id` | Dossier — title, shared + private notes, per-learner homework/marks, transcript |
+| `/sessions/:id/room` | Classroom (prev homework; teacher assign homework) |
+| `/engagements/:id/checkout` | Checkout — choose 4+ sessions, invoice, mock pay |
+| `/engagements/:id/pay` | Redirect → checkout |
+| `/billing` | Invoice list (open / paid) |
+| `/billing/invoices/:id` | Invoice / receipt detail |
+| `/teacher` | Teacher portal — upcoming |
+| `/teacher/requests` | Accept / decline / reschedule message |
+| `/teacher/sessions/:id` | Teacher notes, title, homework + marks |
 | `/ask` | Family Ask list |
 | `/ask/new` | Compose — **learner picker** (who is asking) |
 | `/ask/:id` | Thread |
-| … | (courses, progress, etc. as before; course enroll will use the same learner picker) |
+| … | (courses, progress, etc. as before) |
 
 ### Key flows
 
-**Hire for you or a kid:** Teachers → Profile → Book → pick learner → slot → Sessions  
+**Hire:** Learn → Profile → Request (weekly times + learners) → teacher accepts → free intro (once per guardian+teacher) → pay for **at least 4** sessions (checkout) → recurring calendar until End.  
 
-**Join when class starts:** Home “Class starting” / `/sessions/join` → pick learner’s accepted session → room  
+**Sessions:** Timeline for current engagements; End cancels unpaid future only.  
+
+**Join:** Home Upcoming / `/sessions/join` → room (family on one device).  
 
 **Ask:** `/ask/new` → pick who is asking → submit  
 

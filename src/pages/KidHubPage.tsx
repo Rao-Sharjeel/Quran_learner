@@ -30,15 +30,17 @@ export function KidHubPage() {
   }
 
   const learnerSessions = sessions
-    .filter((s) => s.learnerId === learner.id)
+    .filter((s) => s.learnerIds.includes(learner.id))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const upcoming = learnerSessions
-    .filter((s) => s.status === 'accepted' || s.status === 'pending')
+    .filter((s) => s.status === 'scheduled')
     .slice(0, 3)
   const openHw = sessions
-    .filter((s) => s.learnerId === learner.id && s.homework)
+    .filter((s) => s.learnerIds.includes(learner.id) && s.homework)
     .flatMap((s) =>
-      (s.homework ?? []).filter((h) => !h.done).map((h) => ({ ...h, sessionId: s.id })),
+      (s.homework ?? [])
+        .filter((h) => !h.done && h.learnerId === learner.id)
+        .map((h) => ({ ...h, sessionId: s.id })),
     )
     .slice(0, 5)
   const learnerAsks = asks
@@ -79,7 +81,7 @@ export function KidHubPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <ButtonLink to={`/teachers?for=${learner.id}`}>Book teacher</ButtonLink>
+          <ButtonLink to={`/learn?for=${learner.id}`}>Book teacher</ButtonLink>
           <ButtonLink to={`/sessions?learner=${learner.id}`} variant="secondary">
             Sessions
           </ButtonLink>
@@ -113,7 +115,7 @@ export function KidHubPage() {
                       <p className="font-medium text-ink">{teacher.name}</p>
                       <p className="text-xs text-muted">
                         {SUBJECT_LABELS[session.subject]} ·{' '}
-                        {formatSessionWhen(session.startsAt, session.slotLabel)} ·{' '}
+                        {formatSessionWhen(session.startsAt, '')} ·{' '}
                         {session.status}
                       </p>
                     </Link>
@@ -125,7 +127,15 @@ export function KidHubPage() {
         </section>
 
         <section className="panel p-5">
-          <h2 className="text-lg font-bold tracking-tight text-ink">Open homework</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-bold tracking-tight text-ink">Open homework</h2>
+            <Link
+              to={`/homework?learner=${learner.id}`}
+              className="text-sm font-semibold text-brand-700"
+            >
+              Manage →
+            </Link>
+          </div>
           {openHw.length === 0 ? (
             <p className="mt-3 text-sm text-muted">No open homework items.</p>
           ) : (

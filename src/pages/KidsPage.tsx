@@ -71,7 +71,7 @@ export function KidsPage() {
                 Open
               </Link>
               <Link
-                to={`/teachers?for=${self.id}`}
+                to={`/learn?for=${self.id}`}
                 className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-100"
               >
                 Book for you
@@ -96,8 +96,7 @@ export function KidsPage() {
             {kids.map((kid) => {
               const pending = sessions.filter(
                 (s) =>
-                  s.learnerId === kid.id &&
-                  (s.status === 'pending' || s.status === 'accepted'),
+                  s.learnerIds.includes(kid.id) && s.status === 'scheduled',
               ).length
               const homework = openHomeworkCount(kid.id)
               const asks = underReviewAskCount(kid.id)
@@ -133,7 +132,7 @@ export function KidsPage() {
                       Open
                     </Link>
                     <Link
-                      to={`/teachers?for=${kid.id}`}
+                      to={`/learn?for=${kid.id}`}
                       className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-100"
                     >
                       Book

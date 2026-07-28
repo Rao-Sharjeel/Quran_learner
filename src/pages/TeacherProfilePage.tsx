@@ -1,6 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getTeacher, listReviewsForTeacher } from '../mocks/store'
-import { SUBJECT_LABELS } from '../types'
+import { SUBJECT_LABELS, WEEKDAY_LABELS } from '../types'
 import { BadgePill } from '../components/BadgePill'
 import { ButtonLink } from '../components/Button'
 
@@ -8,9 +8,7 @@ export function TeacherProfilePage() {
   const { id } = useParams()
   const [search] = useSearchParams()
   const forId = search.get('for')
-  const bookTo = forId
-    ? `/teachers/${id}/book?for=${forId}`
-    : `/teachers/${id}/book`
+  const hireTo = forId ? `/learn/${id}/hire?for=${forId}` : `/learn/${id}/hire`
   const teacher = id ? getTeacher(id) : undefined
   const reviews = id ? listReviewsForTeacher(id) : []
 
@@ -18,20 +16,22 @@ export function TeacherProfilePage() {
     return (
       <div className="panel p-8 text-center">
         <p className="font-semibold">Teacher not found</p>
-        <ButtonLink to="/teachers" variant="secondary" className="mt-4">
-          Back to directory
+        <ButtonLink to="/learn" variant="secondary" className="mt-4">
+          Back to Learn
         </ButtonLink>
       </div>
     )
   }
 
+  const byWeekday = [...teacher.availability].sort((a, b) => a.weekday - b.weekday)
+
   return (
     <div className="space-y-6 animate-rise">
       <Link
-        to="/teachers"
+        to="/learn"
         className="text-sm font-medium text-brand-700 transition hover:text-brand-800"
       >
-        ← All teachers
+        ← Learn
       </Link>
 
       <div className="panel p-6 md:p-8">
@@ -57,11 +57,13 @@ export function TeacherProfilePage() {
                 ★ {teacher.rating.toFixed(1)} ({teacher.reviewCount} reviews)
               </span>
               <span className="text-muted">{teacher.languages.join(' · ')}</span>
-              <span className="font-semibold">${teacher.rateUsd}/hr</span>
+              <span className="font-semibold">
+                ${teacher.rateUsd}/session · {teacher.durationMinutes} min
+              </span>
             </div>
           </div>
-          <ButtonLink to={bookTo} className="shrink-0">
-            Hire / Book session
+          <ButtonLink to={hireTo} className="shrink-0">
+            Request sessions
           </ButtonLink>
         </div>
 
@@ -102,24 +104,25 @@ export function TeacherProfilePage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold tracking-tight">Next openings</h2>
+            <h2 className="text-xl font-bold tracking-tight">Weekly availability</h2>
+            <p className="mt-1 text-xs text-muted">
+              Recurring spots · {teacher.timezone}
+            </p>
             <ul className="mt-3 space-y-2">
-              {teacher.availability.map((slot) => (
+              {byWeekday.map((slot) => (
                 <li
                   key={slot.id}
                   className="rounded-xl border border-line px-3 py-2.5 text-sm"
                 >
-                  {slot.label}
+                  <span className="font-semibold text-ink">
+                    {WEEKDAY_LABELS[slot.weekday]}
+                  </span>{' '}
+                  <span className="text-muted">{slot.label.replace(/^\w+\s/, '')}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted">Timezone: {teacher.timezone}</p>
-            <ButtonLink
-              to={bookTo}
-              variant="secondary"
-              className="mt-4 w-full"
-            >
-              Request a slot
+            <ButtonLink to={hireTo} variant="secondary" className="mt-4 w-full">
+              Pick times & send request
             </ButtonLink>
           </div>
         </div>

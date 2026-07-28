@@ -1,25 +1,25 @@
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
+  getEngagement,
   getLearner,
   getTeacher,
-  submitSessionReview,
   toggleHomeworkDone,
+  updateSessionNotes,
   useSession,
 } from '../mocks/store'
 import { SUBJECT_LABELS } from '../types'
 import { Button, ButtonLink } from '../components/Button'
-import { StatusPill } from '../components/StatusPill'
+import { PaymentPill, StatusPill } from '../components/StatusPill'
 import { formatSessionWhen, teacherGivenName } from '../lib/format'
+import { useState } from 'react'
 
 export function SessionDetailPage() {
   const { id } = useParams()
-  const location = useLocation()
-  const justBooked = Boolean(
-    (location.state as { justBooked?: boolean } | null)?.justBooked,
-  )
   const session = useSession(id)
   const teacher = session ? getTeacher(session.teacherId) : undefined
-  const learner = session ? getLearner(session.learnerId) : undefined
+  const engagement = session ? getEngagement(session.engagementId) : undefined
+
+  const [privateDraft, setPrivateDraft] = useState<string | null>(null)
 
   if (!session || !teacher) {
     return (
@@ -32,13 +32,14 @@ export function SessionDetailPage() {
     )
   }
 
-  const canJoin = session.status === 'accepted'
-  const showReview = session.status === 'completed'
-  const learnerLabel = learner
-    ? learner.kind === 'self'
-      ? `${learner.name.split(' ')[0]} (you)`
-      : learner.name
-    : null
+  const canJoin =
+    session.status === 'scheduled' &&
+    (session.paymentStatus === 'paid' || session.paymentStatus === 'free')
+  const learners = session.learnerIds
+    .map((lid) => getLearner(lid))
+    .filter(Boolean)
+  const privateNotes =
+    privateDraft !== null ? privateDraft : (session.privateNotesGuardian ?? '')
 
   return (
     <div className="space-y-6 animate-rise">
@@ -48,14 +49,6 @@ export function SessionDetailPage() {
       >
         ← All sessions
       </Link>
-
-      {justBooked ? (
-        <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-          Booking request sent
-          {learnerLabel ? ` for ${learnerLabel}` : ''}. You’ll be notified when{' '}
-          {teacherGivenName(teacher.name)} responds.
-        </div>
-      ) : null}
 
       <div className="panel p-6 md:p-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
@@ -69,30 +62,29 @@ export function SessionDetailPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-extrabold tracking-tight text-ink">
-                  {teacher.name}
+                  {session.title}
                 </h1>
                 <StatusPill status={session.status} />
+                <PaymentPill status={session.paymentStatus} />
               </div>
               <p className="mt-1 text-muted">
-                {SUBJECT_LABELS[session.subject]} ·{' '}
-                {formatSessionWhen(session.startsAt, session.slotLabel)}
+                {teacher.name} · {SUBJECT_LABELS[session.subject]} ·{' '}
+                {formatSessionWhen(session.startsAt, '')} · {session.durationMinutes} min
+                {session.kind === 'intro' ? ' · Intro' : ''}
               </p>
-              {learner ? (
-                <p className="mt-1 text-sm text-brand-800">
-                  For{' '}
-                  <Link
-                    to={`/kids/${learner.id}`}
-                    className="font-semibold underline-offset-2 hover:underline"
-                  >
-                    {learnerLabel}
-                  </Link>
-                </p>
-              ) : null}
+              <p className="mt-1 text-sm text-brand-800">
+                Learners:{' '}
+                {learners
+                  .map((l) =>
+                    l!.kind === 'self' ? `${l!.name.split(' ')[0]} (you)` : l!.name,
+                  )
+                  .join(', ')}
+              </p>
               <Link
-                to={`/teachers/${teacher.id}`}
+                to={`/learn/${teacher.id}`}
                 className="mt-2 inline-block text-sm font-medium text-brand-700 hover:text-brand-800"
               >
-                View profile
+                View teacher
               </Link>
             </div>
           </div>
@@ -101,122 +93,129 @@ export function SessionDetailPage() {
             {canJoin ? (
               <ButtonLink to={`/sessions/${session.id}/room`}>Join classroom</ButtonLink>
             ) : (
-              <Button type="button" disabled title="Available once the session is accepted">
+              <Button type="button" disabled title="Available when scheduled and paid (or free intro)">
                 Join classroom
               </Button>
             )}
-            <ButtonLink to="/sessions/join" variant="secondary">
-              All joinable
-            </ButtonLink>
+            {engagement?.status === 'awaiting_payment' ? (
+              <ButtonLink
+                to={`/engagements/${engagement.id}/checkout`}
+                variant="secondary"
+              >
+                Pay for sessions
+              </ButtonLink>
+            ) : null}
           </div>
         </div>
 
         {session.studentNote ? (
           <div className="mt-8 border-t border-line pt-6">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
-              Your note
+              Your note to teacher
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ink">{session.studentNote}</p>
           </div>
         ) : null}
 
-        {session.teacherNotes ? (
-          <div className="mt-6 border-t border-line pt-6">
-            <h2 className="text-xl font-bold tracking-tight text-ink">Session notes</h2>
-            <p className="mt-2 leading-relaxed text-muted">{session.teacherNotes}</p>
-          </div>
-        ) : session.status === 'accepted' ? (
-          <div className="mt-6 border-t border-line pt-6">
-            <h2 className="text-xl font-bold tracking-tight text-ink">Session notes</h2>
+        <div className="mt-6 border-t border-line pt-6">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Session notes</h2>
+          {session.sharedNotes ? (
+            <p className="mt-2 leading-relaxed text-muted">{session.sharedNotes}</p>
+          ) : (
             <p className="mt-2 text-sm text-muted">
-              Notes from your teacher will appear here after the session.
+              Shared notes from your teacher will appear here after class.
             </p>
-          </div>
-        ) : null}
+          )}
+        </div>
 
-        {session.homework && session.homework.length > 0 ? (
-          <div className="mt-6 border-t border-line pt-6">
-            <h2 className="text-xl font-bold tracking-tight text-ink">Homework</h2>
+        <div className="mt-6 border-t border-line pt-6">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Your private notes</h2>
+          <p className="mt-1 text-xs text-muted">Only visible to your family account.</p>
+          <textarea
+            className="mt-2 w-full rounded-2xl bg-surface px-3.5 py-2.5 text-sm outline-none ring-1 ring-line focus:ring-2 focus:ring-brand-500/30"
+            rows={3}
+            value={privateNotes}
+            onChange={(e) => setPrivateDraft(e.target.value)}
+            onBlur={() => {
+              if (privateDraft !== null) {
+                updateSessionNotes(session.id, { privateNotesGuardian: privateDraft })
+                setPrivateDraft(null)
+              }
+            }}
+            placeholder="Reminders for yourself…"
+          />
+        </div>
+
+        <div className="mt-6 border-t border-line pt-6">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Homework</h2>
+          {session.homework && session.homework.length > 0 ? (
             <ul className="mt-3 space-y-2">
-              {session.homework.map((item) => (
-                <li key={item.id}>
-                  <div className="flex items-start gap-3 rounded-xl border border-line px-3 py-3 text-sm transition hover:border-brand-200">
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleHomeworkDone(session.id, item.id)}
-                      className="mt-0.5 accent-brand-700"
-                      aria-label={`Mark done: ${item.text}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className={item.done ? 'text-muted line-through' : 'text-ink'}>
-                        {item.text}
-                      </p>
-                      {item.requiresAudio ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-800">
-                            Audio
-                          </span>
-                          {item.submission ? (
-                            <span className="text-xs text-muted">
-                              Uploaded · {item.comments?.length ?? 0} note
-                              {(item.comments?.length ?? 0) === 1 ? '' : 's'}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted">Recording needed</span>
-                          )}
+              {session.homework.map((item) => {
+                const learner = getLearner(item.learnerId)
+                return (
+                  <li key={item.id}>
+                    <div className="flex items-start gap-3 rounded-xl border border-line px-3 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleHomeworkDone(session.id, item.id)}
+                        className="mt-0.5 accent-brand-700"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-muted">
+                          {learner?.kind === 'self'
+                            ? 'You'
+                            : learner?.name.split(' ')[0] ?? 'Learner'}
+                          {item.mark != null ? ` · Mark ${item.mark}/10` : ''}
+                        </p>
+                        <p className={item.done ? 'text-muted line-through' : 'text-ink'}>
+                          {item.text}
+                        </p>
+                        {item.requiresAudio ? (
                           <Link
                             to={`/sessions/${session.id}/homework/${item.id}`}
-                            className="text-xs font-semibold text-brand-700 hover:text-brand-800"
+                            className="mt-1 inline-block text-xs font-semibold text-brand-700"
                           >
                             Open audio workspace →
                           </Link>
-                          {item.submission ? (
-                            <Link
-                              to={`/sessions/${session.id}/homework/${item.id}?as=teacher`}
-                              className="text-xs font-semibold text-muted hover:text-brand-700"
-                            >
-                              Teacher review
-                            </Link>
-                          ) : null}
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
-          </div>
-        ) : null}
+          ) : (
+            <p className="mt-2 text-sm text-muted">No homework for this session yet.</p>
+          )}
+        </div>
 
-        {showReview ? (
-          <div className="mt-6 border-t border-line pt-6">
-            <h2 className="text-xl font-bold tracking-tight text-ink">Leave a review</h2>
-            {session.reviewSubmitted ? (
-              <p className="mt-2 text-sm text-brand-700">
-                Thanks — your review was submitted.
-              </p>
-            ) : (
-              <>
-                <p className="mt-2 text-sm text-muted">
-                  Tell other students how this session went with {teacherGivenName(teacher.name)}.
-                </p>
-                <Button
-                  type="button"
-                  className="mt-4"
-                  onClick={() => submitSessionReview(session.id)}
-                >
-                  Leave review
-                </Button>
-              </>
-            )}
-          </div>
-        ) : null}
+        <div className="mt-6 border-t border-line pt-6">
+          <h2 className="text-xl font-bold tracking-tight text-ink">Transcript</h2>
+          {session.transcript && session.transcript.length > 0 ? (
+            <div className="mt-4 space-y-5">
+              {session.transcript.map((section) => (
+                <div key={section.heading}>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
+                    {section.heading}
+                  </h3>
+                  <p className="mt-2 leading-relaxed text-ink">{section.body}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted">
+              {session.status === 'completed'
+                ? 'Transcript will appear after class.'
+                : 'Transcript appears after the session is completed.'}
+            </p>
+          )}
+        </div>
 
-        {session.status === 'pending' ? (
-          <p className="mt-8 text-sm text-muted">
-            Waiting for the teacher to accept. Check back under Sessions, or keep browsing the
-            directory.
+        {session.status === 'completed' && !session.reviewSubmitted ? (
+          <p className="mt-6 text-sm text-muted">
+            How was class with {teacherGivenName(teacher.name)}? Reviews open from your teacher’s
+            Learn profile after more sessions.
           </p>
         ) : null}
       </div>

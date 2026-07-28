@@ -34,7 +34,7 @@ export function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <ButtonLink to="/app">Open family dashboard</ButtonLink>
-              <ButtonLink to="/teachers" variant="secondary">
+              <ButtonLink to="/learn" variant="secondary">
                 Browse teachers
               </ButtonLink>
             </div>

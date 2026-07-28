@@ -11,8 +11,8 @@ export function TeacherCard({
   forLearnerId?: string
 }) {
   const to = forLearnerId
-    ? `/teachers/${teacher.id}?for=${forLearnerId}`
-    : `/teachers/${teacher.id}`
+    ? `/learn/${teacher.id}?for=${forLearnerId}`
+    : `/learn/${teacher.id}`
   return (
     <Link
       to={to}
@@ -40,7 +40,7 @@ export function TeacherCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {teacher.subjects.slice(0, 3).map((s) => (
+        {teacher.subjects.slice(0, 4).map((s) => (
           <span
             key={s}
             className="rounded-lg bg-brand-50 px-2 py-0.5 text-xs text-brand-800"
@@ -52,9 +52,9 @@ export function TeacherCard({
 
       <div className="mt-auto flex items-center justify-between pt-5 text-sm">
         <span className="text-muted">
-          ★ {teacher.rating.toFixed(1)} · {teacher.reviewCount}
+          ★ {teacher.rating.toFixed(1)} · {teacher.durationMinutes} min
         </span>
-        <span className="font-semibold text-ink">${teacher.rateUsd}/hr</span>
+        <span className="font-semibold text-ink">${teacher.rateUsd}/session</span>
       </div>
     </Link>
   )

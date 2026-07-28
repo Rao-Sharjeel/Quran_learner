@@ -19,32 +19,108 @@ export interface Teacher {
   subjects: SubjectId[]
   languages: string[]
   rateUsd: number
+  /** Regular session length in minutes */
+  durationMinutes: number
   timezone: string
   rating: number
   reviewCount: number
   badges: BadgeId[]
   avatarColor: string
   initials: string
-  availability: AvailabilitySlot[]
+  /** Recurring weekly availability (not one-off dates) */
+  availability: WeeklyAvailabilitySlot[]
 }
 
-export interface AvailabilitySlot {
+/** Curated group / self-paced style courses (Phase 1 mock) */
+export interface Course {
   id: string
-  label: string
-  startsAt: string
+  title: string
+  subject: SubjectId
+  teacherId: string
+  level: 'beginner' | 'intermediate' | 'advanced'
+  weeks: number
+  students: number
+  /** Highlight on home “New” slide */
+  isNew?: boolean
+  /** Highlight on home “Popular” slide */
+  isPopular?: boolean
+  accentColor: string
 }
 
-export type SessionStatus = 'pending' | 'accepted' | 'completed' | 'declined'
+/** Recurring weekly slot on a teacher's calendar (0 = Sunday) */
+export interface WeeklyAvailabilitySlot {
+  id: string
+  weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6
+  /** Local time HH:mm (24h) */
+  startTime: string
+  label: string
+}
+
+/** @deprecated Use WeeklyAvailabilitySlot */
+export type AvailabilitySlot = WeeklyAvailabilitySlot
+
+export type EngagementStatus =
+  | 'pending'
+  | 'intro_scheduled'
+  | 'awaiting_payment'
+  | 'active'
+  | 'ended'
+  | 'declined'
+  /** Guardian chose not to continue after intro / before paying */
+  | 'not_hired'
+
+/** Guardian ↔ teacher relationship with recurring weekly slots */
+export interface TeachingEngagement {
+  id: string
+  guardianId: string
+  teacherId: string
+  subject: SubjectId
+  learnerIds: string[]
+  weeklySlotIds: string[]
+  status: EngagementStatus
+  /** Topic suggestion from guardian at request time */
+  titleSuggestion?: string
+  studentNote?: string
+  teacherMessage?: string
+  /** Free intro already consumed for this guardian+teacher (incl. prior ended engagements) */
+  introUsed: boolean
+  prepaidSessionCredits: number
+  endedAt?: string
+  createdAt: string
+}
+
+export type SessionKind = 'intro' | 'regular'
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled'
+export type PaymentStatus = 'free' | 'paid' | 'unpaid' | 'pending_payment'
 
 export interface HomeworkItem {
   id: string
+  learnerId: string
   text: string
   done: boolean
+  /** 0–10 teacher mark */
+  mark?: number
   /** Student should upload a recording for this task */
   requiresAudio?: boolean
   submission?: HomeworkAudioSubmission
   /** Teacher (and student reply) comments anchored to the recording timeline */
   comments?: HomeworkAudioComment[]
+}
+
+export type NotificationKind =
+  | 'engagement_accepted'
+  | 'payment_due'
+  | 'session_reminder'
+  | 'hire_success'
+
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  title: string
+  body: string
+  createdAt: string
+  read: boolean
+  href?: string
 }
 
 export type HomeworkCommentKind = 'text' | 'audio'
@@ -72,18 +148,33 @@ export interface HomeworkAudioComment {
   createdAt: string
 }
 
+/** Readable mock transcript section (Warm-up / Lesson / Closing, etc.) */
+export interface SessionTranscriptSection {
+  heading: string
+  body: string
+}
+
 export interface Session {
   id: string
-  /** Learner taking the session (parent self or a kid) */
-  learnerId: string
+  engagementId: string
   teacherId: string
-  slotLabel: string
-  startsAt: string
-  status: SessionStatus
+  /** One or more family learners on the same device */
+  learnerIds: string[]
+  title: string
   subject: SubjectId
+  startsAt: string
+  durationMinutes: number
+  kind: SessionKind
+  status: SessionStatus
+  paymentStatus: PaymentStatus
+  /** Weekly slot id this occurrence came from (if any) */
+  weeklySlotId?: string
   studentNote?: string
-  teacherNotes?: string
+  sharedNotes?: string
+  privateNotesGuardian?: string
+  privateNotesTeacher?: string
   homework?: HomeworkItem[]
+  transcript?: SessionTranscriptSection[]
   reviewSubmitted?: boolean
 }
 
@@ -205,10 +296,64 @@ export const BADGE_LABELS: Record<BadgeId, string> = {
 }
 
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
-  pending: 'Pending',
-  accepted: 'Accepted',
+  scheduled: 'Scheduled',
   completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  free: 'Free intro',
+  paid: 'Paid',
+  unpaid: 'Unpaid',
+  pending_payment: 'Payment pending',
+}
+
+export const ENGAGEMENT_STATUS_LABELS: Record<EngagementStatus, string> = {
+  pending: 'Pending review',
+  intro_scheduled: 'Intro scheduled',
+  awaiting_payment: 'Awaiting payment',
+  active: 'Active',
+  ended: 'Ended',
   declined: 'Declined',
+  not_hired: 'Not hired',
+}
+
+export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+export const INTRO_DURATION_MINUTES = 15
+/** Minimum sessions in a prepaid package */
+export const PACKAGE_SESSION_COUNT = 4
+export const CALENDAR_HORIZON_DAYS = 60
+
+export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void'
+
+export interface InvoiceLine {
+  description: string
+  quantity: number
+  unitAmountUsd: number
+}
+
+export interface Invoice {
+  id: string
+  engagementId: string
+  teacherId: string
+  status: InvoiceStatus
+  /** Sessions purchased — always >= PACKAGE_SESSION_COUNT */
+  sessionCount: number
+  lines: InvoiceLine[]
+  subtotalUsd: number
+  totalUsd: number
+  currency: 'USD'
+  createdAt: string
+  paidAt?: string
+  invoiceNumber: string
+}
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
+  open: 'Open',
+  paid: 'Paid',
+  void: 'Void',
 }
 
 export const ASK_STATUS_LABELS: Record<AskStatus, string> = {

@@ -39,36 +39,38 @@ export function TeachersPage() {
     <div className="space-y-8 animate-rise">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
-          Teachers
+          Learn
         </h1>
         <p className="mt-2 max-w-xl text-muted">
-          Every teacher is reviewed before they appear here. When you book, choose whether the
-          session is for you or a kid.
+          Hire a vetted teacher. Filter by subject, open a profile, pick weekly times, and send a
+          request — sessions appear under Sessions after they accept.
         </p>
         {forLearner ? (
           <p className="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800">
-            Prefilling booking for{' '}
+            Prefilling for{' '}
             <strong>
               {forLearner.kind === 'self'
                 ? `${forLearner.name.split(' ')[0]} (you)`
                 : forLearner.name}
             </strong>
-            . You can change this on the book form.
+            . You can add more learners on the request form.
           </p>
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-3 panel p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <input
+          type="search"
+          placeholder="Search teachers"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or topic"
-          className={`w-full flex-1 ${fieldClass}`}
+          className={`${fieldClass} w-full sm:min-w-[14rem] sm:flex-1`}
         />
         <select
           value={subject}
           onChange={(e) => setSubject(e.target.value as SubjectId | 'all')}
           className={fieldClass}
+          aria-label="Filter by subject"
         >
           <option value="all">All subjects</option>
           {subjects.map((s) => (
@@ -81,6 +83,7 @@ export function TeachersPage() {
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
           className={fieldClass}
+          aria-label="Filter by language"
         >
           <option value="all">All languages</option>
           {languages.map((l) => (
@@ -91,31 +94,12 @@ export function TeachersPage() {
         </select>
       </div>
 
-      <p className="text-sm text-muted">
-        {filtered.length === 0
-          ? 'No teachers match these filters.'
-          : `${filtered.length} teacher${filtered.length === 1 ? '' : 's'}`}
-      </p>
-
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-canvas/70 px-5 py-10 text-center">
-          <p className="font-semibold text-ink">Try another subject or language</p>
-          <button
-            type="button"
-            className="mt-3 text-sm font-semibold text-brand-700 hover:text-brand-800"
-            onClick={() => {
-              setQuery('')
-              setSubject('all')
-              setLanguage('all')
-            }}
-          >
-            Clear filters
-          </button>
-        </div>
+        <p className="text-sm text-muted">No teachers match these filters.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((teacher) => (
-            <TeacherCard key={teacher.id} teacher={teacher} forLearnerId={forId} />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((t) => (
+            <TeacherCard key={t.id} teacher={t} forLearnerId={forId} />
           ))}
         </div>
       )}

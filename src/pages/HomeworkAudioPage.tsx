@@ -42,7 +42,10 @@ export function HomeworkAudioPage() {
   const session = useSession(sessionId)
   const item = sessionId && hwId ? getHomeworkItem(sessionId, hwId) : undefined
   const teacher = session ? getTeacher(session.teacherId) : undefined
-  const learner = session ? getLearner(session.learnerId) : undefined
+  const hwItem = session && hwId ? getHomeworkItem(session.id, hwId) : undefined
+  const learner = session
+    ? getLearner(hwItem?.learnerId ?? session.learnerIds[0]!)
+    : undefined
   const guardian = getGuardian()
 
   const mode = params.get('as') === 'teacher' ? 'teacher' : 'student'

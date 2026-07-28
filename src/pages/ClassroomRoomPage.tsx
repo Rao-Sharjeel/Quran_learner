@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getLearner, getTeacher, markSessionCompleted, useSession } from '../mocks/store'
-import { SUBJECT_LABELS } from '../types'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  assignHomework,
+  getLearner,
+  getTeacher,
+  markSessionCompleted,
+  previousCompletedSession,
+  useSession,
+} from '../mocks/store'
 import { teacherGivenName } from '../lib/format'
 
 type ShareMode = 'none' | 'screen' | 'pdf' | 'whiteboard'
+type SidePanel = 'none' | 'prevHw' | 'assignHw'
 
 const mushafPages = [
   {
@@ -27,16 +34,25 @@ const mushafPages = [
 export function ClassroomRoomPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const isTeacherView = location.pathname.startsWith('/teacher/')
   const session = useSession(id)
   const teacher = session ? getTeacher(session.teacherId) : undefined
-  const learner = session ? getLearner(session.learnerId) : undefined
+  const learner = session ? getLearner(session.learnerIds[0]!) : undefined
+  const allLearners = session
+    ? session.learnerIds.map((lid) => getLearner(lid)).filter(Boolean)
+    : []
+  const prevSession = id ? previousCompletedSession(id) : undefined
 
   const [shareMode, setShareMode] = useState<ShareMode>('none')
   const [chatOpen, setChatOpen] = useState(false)
+  const [sidePanel, setSidePanel] = useState<SidePanel>('none')
   const [micOn, setMicOn] = useState(true)
   const [camOn, setCamOn] = useState(true)
   const [pageIndex, setPageIndex] = useState(0)
   const [chatDraft, setChatDraft] = useState('')
+  const [hwText, setHwText] = useState('')
+  const [hwLearner, setHwLearner] = useState('')
   const [messages, setMessages] = useState([
     { id: 'm1', from: 'teacher' as const, text: 'Assalamu alaikum — can you hear me clearly?' },
     { id: 'm2', from: 'you' as const, text: 'Wa alaikum assalam — yes, ready.' },
@@ -47,17 +63,19 @@ export function ClassroomRoomPage() {
 
   const title = useMemo(() => {
     if (!session || !teacher) return 'Classroom'
-    const who = learner
-      ? learner.kind === 'self'
-        ? `${learner.name.split(' ')[0]} · `
-        : `${learner.name.split(' ')[0]} · `
-      : ''
-    return `${who}${SUBJECT_LABELS[session.subject]} with ${teacherGivenName(teacher.name)}`
-  }, [session, teacher, learner])
+    return `${session.title} · ${teacherGivenName(teacher.name)}`
+  }, [session, teacher])
+
+  useEffect(() => {
+    if (session?.learnerIds[0]) setHwLearner(session.learnerIds[0])
+  }, [session?.learnerIds])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setChatOpen(false)
+      if (e.key === 'Escape') {
+        setChatOpen(false)
+        setSidePanel('none')
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -77,12 +95,12 @@ export function ClassroomRoomPage() {
   }
 
   function leave() {
-    navigate(`/sessions/${session!.id}`)
+    navigate(isTeacherView ? `/teacher/sessions/${session!.id}` : `/sessions/${session!.id}`)
   }
 
   function endSession() {
     markSessionCompleted(session!.id)
-    navigate(`/sessions/${session!.id}`)
+    navigate(isTeacherView ? `/teacher/sessions/${session!.id}` : `/sessions/${session!.id}`)
   }
 
   function sendChat() {
@@ -96,20 +114,55 @@ export function ClassroomRoomPage() {
     setShareMode((current) => (current === mode ? 'none' : mode))
   }
 
+  const learnersLabel = allLearners
+    .map((l) => (l!.kind === 'self' ? 'You' : l!.name.split(' ')[0]))
+    .join(', ')
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-brand-800 text-brand-50">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
         <div className="min-w-0">
           <p className="truncate text-lg font-bold tracking-tight text-white">{title}</p>
-          <p className="text-xs text-brand-200">Classroom shell · placeholders only</p>
+          <p className="truncate text-xs text-brand-200">
+            {learnersLabel} · classroom shell
+            {isTeacherView ? ' · teacher' : ''}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={endSession}
-          className="rounded-xl bg-brass px-3.5 py-2 text-xs font-semibold text-brand-800 transition hover:bg-brass-soft"
-        >
-          End session
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSidePanel((p) => (p === 'prevHw' ? 'none' : 'prevHw'))}
+            className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/15"
+          >
+            Prev homework
+          </button>
+          {isTeacherView ? (
+            <button
+              type="button"
+              onClick={() => setSidePanel((p) => (p === 'assignHw' ? 'none' : 'assignHw'))}
+              className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/15"
+            >
+              Assign homework
+            </button>
+          ) : null}
+          {isTeacherView ? (
+            <button
+              type="button"
+              onClick={endSession}
+              className="rounded-xl bg-brass px-3.5 py-2 text-xs font-semibold text-brand-800 transition hover:bg-brass-soft"
+            >
+              End session
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={leave}
+              className="rounded-xl bg-brass px-3.5 py-2 text-xs font-semibold text-brand-800 transition hover:bg-brass-soft"
+            >
+              Leave
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="relative flex min-h-0 flex-1">
@@ -131,8 +184,7 @@ export function ClassroomRoomPage() {
                 ) : null}
                 {shareMode === 'whiteboard' ? <WhiteboardStage /> : null}
               </div>
-
-              <div className="flex shrink-0 gap-2 overflow-x-auto md:w-[190px] md:flex-col md:overflow-y-auto md:overflow-x-hidden">
+              <div className="flex shrink-0 gap-2 overflow-x-auto md:w-[190px] md:flex-col">
                 <ParticipantTile
                   name={teacher.name}
                   initials={teacher.initials}
@@ -140,16 +192,19 @@ export function ClassroomRoomPage() {
                   subtitle="Teacher"
                   compact
                 />
-                <ParticipantTile
-                  name={learner?.name ?? 'You'}
-                  initials={learner?.initials ?? 'AR'}
-                  color={learner?.avatarColor ?? '#245544'}
-                  subtitle={camOn ? 'Camera on' : 'Camera off'}
-                  compact
-                  muted={!micOn}
-                  self
-                  camOff={!camOn}
-                />
+                {allLearners.map((l) => (
+                  <ParticipantTile
+                    key={l!.id}
+                    name={l!.name}
+                    initials={l!.initials}
+                    color={l!.avatarColor}
+                    subtitle="On device"
+                    compact
+                    muted={!micOn}
+                    self
+                    camOff={!camOn}
+                  />
+                ))}
               </div>
             </div>
           ) : (
@@ -161,10 +216,10 @@ export function ClassroomRoomPage() {
                 subtitle="Teacher"
               />
               <ParticipantTile
-                name={learner?.name ?? 'You'}
+                name={learner?.name ?? 'Family'}
                 initials={learner?.initials ?? 'AR'}
                 color={learner?.avatarColor ?? '#245544'}
-                subtitle={camOn ? 'Camera on' : 'Camera off'}
+                subtitle={`${learnersLabel} · same device`}
                 muted={!micOn}
                 self
                 camOff={!camOn}
@@ -173,18 +228,87 @@ export function ClassroomRoomPage() {
           )}
         </div>
 
+        {sidePanel !== 'none' ? (
+          <aside className="flex h-full w-full max-w-[340px] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-brand-700/90">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <h2 className="text-base font-bold text-white">
+                {sidePanel === 'prevHw' ? 'Previous homework' : 'Assign homework'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSidePanel('none')}
+                className="grid h-8 w-8 place-items-center rounded-lg text-brand-100 hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4 text-sm">
+              {sidePanel === 'prevHw' ? (
+                prevSession?.homework?.length ? (
+                  prevSession.homework.map((h) => {
+                    const l = getLearner(h.learnerId)
+                    return (
+                      <div
+                        key={h.id}
+                        className="rounded-xl bg-brand-800/60 px-3 py-2 ring-1 ring-white/10"
+                      >
+                        <p className="text-xs font-bold text-brass-soft">
+                          {l?.name.split(' ')[0]}
+                          {h.mark != null ? ` · ${h.mark}/10` : ''}
+                          {h.done ? ' · done' : ' · open'}
+                        </p>
+                        <p className="mt-1 text-brand-50">{h.text}</p>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-brand-200">No previous homework for this engagement.</p>
+                )
+              ) : (
+                <div className="space-y-3">
+                  <select
+                    className="w-full rounded-xl bg-brand-800 px-3 py-2 text-brand-50 ring-1 ring-white/15"
+                    value={hwLearner}
+                    onChange={(e) => setHwLearner(e.target.value)}
+                  >
+                    {session.learnerIds.map((lid) => (
+                      <option key={lid} value={lid}>
+                        {getLearner(lid)?.name ?? lid}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    className="w-full rounded-xl bg-brand-800 px-3 py-2 text-brand-50 ring-1 ring-white/15"
+                    rows={3}
+                    value={hwText}
+                    onChange={(e) => setHwText(e.target.value)}
+                    placeholder="Homework for this learner"
+                  />
+                  <button
+                    type="button"
+                    className="w-full rounded-xl bg-brass py-2 text-sm font-semibold text-brand-900"
+                    onClick={() => {
+                      assignHomework(session.id, { learnerId: hwLearner, text: hwText })
+                      setHwText('')
+                      setSidePanel('none')
+                    }}
+                  >
+                    Assign
+                  </button>
+                </div>
+              )}
+            </div>
+          </aside>
+        ) : null}
+
         {chatOpen ? (
           <aside className="flex h-full w-full max-w-[340px] shrink-0 flex-col overflow-hidden border-l border-white/10 bg-brand-700/80">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <div>
-                <h2 className="text-base font-bold tracking-tight text-white">Session chat</h2>
-                <p className="text-xs text-brand-200">Local mock — not synced yet</p>
-              </div>
+              <h2 className="text-base font-bold text-white">Session chat</h2>
               <button
                 type="button"
                 onClick={() => setChatOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-lg text-brand-100 transition hover:bg-white/10 hover:text-white"
-                aria-label="Close chat"
+                className="grid h-8 w-8 place-items-center rounded-lg text-brand-100 hover:bg-white/10"
               >
                 ✕
               </button>
@@ -200,133 +324,57 @@ export function ClassroomRoomPage() {
                       : 'bg-brand-800/70 text-brand-50',
                   ].join(' ')}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
-                    {m.from === 'you' ? 'You' : teacherGivenName(teacher.name)}
-                  </p>
-                  <p className="mt-0.5">{m.text}</p>
+                  {m.text}
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 border-t border-white/10 p-3">
-              <input
-                value={chatDraft}
-                onChange={(e) => setChatDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    sendChat()
-                  }
+            <div className="border-t border-white/10 p-3">
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  sendChat()
                 }}
-                placeholder="Write a message"
-                className="w-full rounded-xl border border-white/10 bg-brand-800/60 px-3 py-2.5 text-sm text-white outline-none placeholder:text-brand-200 focus:border-brass/50 focus:ring-2 focus:ring-brass/30"
-              />
-              <button
-                type="button"
-                onClick={sendChat}
-                className="rounded-xl bg-brass px-4 text-sm font-semibold text-brand-800 transition hover:bg-brass-soft"
               >
-                Send
-              </button>
+                <input
+                  value={chatDraft}
+                  onChange={(e) => setChatDraft(e.target.value)}
+                  className="min-w-0 flex-1 rounded-xl bg-brand-800/80 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/15"
+                  placeholder="Message…"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-brass px-3 text-xs font-semibold text-brand-900"
+                >
+                  Send
+                </button>
+              </form>
             </div>
           </aside>
         ) : null}
       </div>
 
-      <footer className="shrink-0 border-t border-white/10 px-3 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2">
-          <ControlButton
-            active={micOn}
-            danger={!micOn}
-            label={micOn ? 'Mute' : 'Unmute'}
-            onClick={() => setMicOn((v) => !v)}
-          >
-            {micOn ? 'Mic' : 'Mic off'}
-          </ControlButton>
-          <ControlButton
-            active={camOn}
-            danger={!camOn}
-            label={camOn ? 'Turn off camera' : 'Turn on camera'}
-            onClick={() => setCamOn((v) => !v)}
-          >
-            {camOn ? 'Cam' : 'Cam off'}
-          </ControlButton>
-
-          <span className="mx-1 hidden h-6 w-px bg-white/15 sm:block" aria-hidden="true" />
-
-          <ControlButton
-            active={shareMode === 'screen'}
-            label="Share screen"
-            onClick={() => toggleShare('screen')}
-          >
-            Share
-          </ControlButton>
-          <ControlButton
-            active={shareMode === 'pdf'}
-            label="Present mushaf PDF"
-            onClick={() => toggleShare('pdf')}
-          >
-            PDF
-          </ControlButton>
-          <ControlButton
-            active={shareMode === 'whiteboard'}
-            label="Open whiteboard"
-            onClick={() => toggleShare('whiteboard')}
-          >
-            Board
-          </ControlButton>
-          <ControlButton
-            active={chatOpen}
-            label="Toggle chat"
-            onClick={() => setChatOpen((v) => !v)}
-          >
-            Chat
-          </ControlButton>
-
-          <span className="mx-1 hidden h-6 w-px bg-white/15 sm:block" aria-hidden="true" />
-
-          <button
-            type="button"
-            onClick={leave}
-            className="rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
-          >
-            Leave
-          </button>
-        </div>
+      <footer className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">
+        <ControlBtn label={micOn ? 'Mute' : 'Unmute'} onClick={() => setMicOn((v) => !v)} />
+        <ControlBtn label={camOn ? 'Cam off' : 'Cam on'} onClick={() => setCamOn((v) => !v)} />
+        <ControlBtn label="Chat" onClick={() => setChatOpen((v) => !v)} />
+        <ControlBtn label="Screen" onClick={() => toggleShare('screen')} />
+        <ControlBtn label="PDF" onClick={() => toggleShare('pdf')} />
+        <ControlBtn label="Board" onClick={() => toggleShare('whiteboard')} />
+        {!isTeacherView ? <ControlBtn label="Leave" onClick={leave} /> : null}
       </footer>
     </div>
   )
 }
 
-function ControlButton({
-  children,
-  label,
-  active,
-  danger,
-  onClick,
-}: {
-  children: string
-  label: string
-  active?: boolean
-  danger?: boolean
-  onClick: () => void
-}) {
+function ControlBtn({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
       onClick={onClick}
-      className={[
-        'rounded-xl px-4 py-2.5 text-sm font-medium transition',
-        danger
-          ? 'bg-red-700/90 text-white hover:bg-red-600'
-          : active
-            ? 'bg-brass text-brand-800 hover:bg-brass-soft'
-            : 'bg-white/10 text-brand-50 hover:bg-white/15',
-      ].join(' ')}
+      className="rounded-full bg-white/10 px-3.5 py-2 text-xs font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
     >
-      {children}
+      {label}
     </button>
   )
 }
@@ -336,10 +384,10 @@ function ParticipantTile({
   initials,
   color,
   subtitle,
-  compact = false,
-  muted = false,
-  self = false,
-  camOff = false,
+  compact,
+  muted,
+  self,
+  camOff,
 }: {
   name: string
   initials: string
@@ -353,56 +401,26 @@ function ParticipantTile({
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-3xl bg-black/35 ring-1 ring-white/10',
-        compact
-          ? 'h-[110px] w-[150px] shrink-0 md:aspect-[4/3] md:h-auto md:w-full'
-          : 'min-h-[220px]',
+        'relative overflow-hidden rounded-3xl bg-black/25 ring-1 ring-white/10',
+        compact ? 'h-[88px] w-[160px] shrink-0 md:aspect-video md:h-auto md:w-full' : 'min-h-0',
       ].join(' ')}
     >
-      <div className="absolute inset-0 login-pattern opacity-35" />
-      <div className="relative grid h-full place-items-center p-4">
-        {camOff && self ? (
-          <div className="text-center">
-            <div
-              className="mx-auto grid place-items-center rounded-2xl font-semibold text-white"
-              style={{
-                background: color,
-                width: compact ? 48 : 80,
-                height: compact ? 48 : 80,
-                fontSize: compact ? 14 : 24,
-              }}
-            >
-              {initials}
-            </div>
-            {!compact ? <p className="mt-3 text-sm text-brand-100">Camera is off</p> : null}
-          </div>
-        ) : (
-          <div
-            className="grid place-items-center rounded-2xl font-semibold text-white"
-            style={{
-              background: color,
-              width: compact ? 52 : 88,
-              height: compact ? 52 : 88,
-              fontSize: compact ? 16 : 28,
-            }}
-          >
-            {initials}
-          </div>
-        )}
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-brand-800/90 to-transparent p-3">
-        <div className="min-w-0">
-          <p className={`truncate font-medium text-white ${compact ? 'text-xs' : 'text-sm'}`}>
-            {name}
-          </p>
-          {!compact ? <p className="text-xs text-brand-200">{subtitle}</p> : null}
+      <div className="absolute inset-0 grid place-items-center">
+        <div
+          className="grid h-16 w-16 place-items-center rounded-2xl text-lg font-bold text-white"
+          style={{ background: color }}
+        >
+          {initials}
         </div>
-        {muted ? (
-          <span className="rounded-lg bg-red-700/90 px-2 py-0.5 text-[10px] font-semibold text-white">
-            Muted
-          </span>
-        ) : null}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+        <p className="truncate text-sm font-semibold text-white">
+          {name}
+          {self ? ' (you)' : ''}
+          {muted ? ' · muted' : ''}
+          {camOff ? ' · cam off' : ''}
+        </p>
+        <p className="truncate text-[11px] text-brand-200">{subtitle}</p>
       </div>
     </div>
   )
@@ -410,28 +428,10 @@ function ParticipantTile({
 
 function ScreenShareStage() {
   return (
-    <div className="flex h-full min-h-[280px] flex-col">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 text-xs text-brand-200">
-        <span>Presenting · Screen</span>
-        <span className="rounded-lg bg-brass/20 px-2 py-0.5 text-brass-soft">Demo share</span>
-      </div>
-      <div className="relative flex flex-1 items-center justify-center bg-brand-800/80 p-6">
-        <div className="w-full max-w-3xl panel text-ink shadow-xl">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-            <span className="font-semibold text-brand-800">Ilm</span>
-            <span className="text-xs text-muted">mushaf-notes · shared window</span>
-          </div>
-          <div className="space-y-3 p-6 sm:p-8">
-            <p className="text-xl font-bold tracking-tight text-ink">Tajweed notes</p>
-            <p className="text-sm leading-relaxed text-muted">
-              Screen-share placeholder. The shared window fills this stage; participant videos stay
-              in the filmstrip beside it.
-            </p>
-            <div className="h-2 w-2/3 rounded bg-brand-100" />
-            <div className="h-2 w-1/2 rounded bg-brand-100" />
-            <div className="h-2 w-3/4 rounded bg-brand-100" />
-          </div>
-        </div>
+    <div className="grid h-full place-items-center bg-canvas p-6 text-center text-ink">
+      <div>
+        <p className="text-xl font-bold tracking-tight">Tajweed notes</p>
+        <p className="mt-2 text-sm text-muted">mushaf-notes · shared window</p>
       </div>
     </div>
   )
@@ -444,52 +444,31 @@ function PdfStage({
   onPrev,
   onNext,
 }: {
-  page: (typeof mushafPages)[number]
+  page: (typeof mushafPages)[number] | undefined
   pageIndex: number
   pageCount: number
   onPrev: () => void
   onNext: () => void
 }) {
   return (
-    <div className="flex h-full min-h-[280px] flex-col bg-canvas text-ink">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Mushaf PDF</p>
-          <p className="text-lg font-bold tracking-tight">{page.title}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={pageIndex === 0}
-            onClick={onPrev}
-            className="rounded-xl bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="text-xs text-muted">
-            {pageIndex + 1} / {pageCount}
-          </span>
-          <button
-            type="button"
-            disabled={pageIndex === pageCount - 1}
-            onClick={onNext}
-            className="rounded-xl bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+    <div className="flex h-full flex-col bg-canvas text-ink">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2 text-sm">
+        <button type="button" onClick={onPrev} className="font-semibold text-brand-700">
+          Prev
+        </button>
+        <span className="text-muted">
+          {pageIndex + 1} / {pageCount}
+        </span>
+        <button type="button" onClick={onNext} className="font-semibold text-brand-700">
+          Next
+        </button>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center bg-brand-50/50 px-6 py-8 text-center">
-        <p
-          className="max-w-2xl font-arabic text-3xl leading-loose text-brand-800 sm:text-4xl"
-          dir="rtl"
-          lang="ar"
-        >
-          {page.arabic}
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-sm font-semibold text-muted">{page?.title}</p>
+        <p className="font-arabic text-2xl leading-loose" dir="rtl" lang="ar">
+          {page?.arabic}
         </p>
-        <p className="mt-6 rounded-xl bg-brass-soft/80 px-3 py-2 text-sm text-brand-800">
-          Highlight · {page.note}
-        </p>
+        <p className="max-w-md text-sm text-muted">{page?.note}</p>
       </div>
     </div>
   )
@@ -497,34 +476,8 @@ function PdfStage({
 
 function WhiteboardStage() {
   return (
-    <div className="relative flex h-full min-h-[280px] flex-col bg-[#f3efe6] text-ink">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgb(19 32 28 / 0.06) 1px, transparent 1px), linear-gradient(90deg, rgb(19 32 28 / 0.06) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }}
-      />
-      <div className="relative flex flex-1 flex-col items-center justify-center p-8 text-center">
-        <p className="text-2xl font-extrabold tracking-tight text-brand-800">Whiteboard</p>
-        <p className="mt-2 max-w-md text-sm text-muted">
-          Drawing tools arrive in Phase 2. Videos stay in the filmstrip while this is presented.
-        </p>
-        <svg
-          className="mt-8 h-24 w-48 text-brand-600"
-          viewBox="0 0 200 100"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M10 70 C40 20, 80 20, 110 55 S170 90, 190 40"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+    <div className="grid h-full place-items-center bg-[#f7f3ea] text-ink">
+      <p className="text-sm font-semibold text-muted">Whiteboard placeholder</p>
     </div>
   )
 }

@@ -111,6 +111,13 @@ export function LoginPage() {
           >
             Continue as Amina Rahman
           </button>
+          <button
+            type="button"
+            onClick={() => navigate('/teacher')}
+            className="mt-2 w-full rounded-2xl py-2.5 text-sm font-semibold text-muted transition hover:bg-surface"
+          >
+            Continue as teacher (demo)
+          </button>
         </div>
       </section>
     </div>

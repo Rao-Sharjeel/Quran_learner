@@ -46,7 +46,8 @@ button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: inherit;
+  letter-spacing: inherit;
 }
 
 /* Soft limestone panels — slightly lifted from the page ground */
@@ -112,7 +113,8 @@ textarea {
 }
 
 .animate-rise {
-  animation: rise-in 0.45s ease-out both;
+  /* Avoid fill-mode "both" — a lingering transform traps position:fixed children */
+  animation: rise-in 0.45s ease-out;
 }
 
 .animate-rise-delay-1 {
