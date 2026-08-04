@@ -1,30 +1,33 @@
 import { JoinClassPicker } from '../components/JoinClassPicker'
-import { ButtonLink } from '../components/Button'
 import { Link } from 'react-router-dom'
 
 export function JoinSessionPage() {
   return (
-    <div className="mx-auto max-w-lg space-y-6 animate-rise">
-      <Link to="/sessions" className="text-sm font-medium text-brand-700 hover:text-brand-800">
-        ← All sessions
-      </Link>
-
-      <div className="panel p-6 md:p-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink">
-          Join a class
-        </h1>
-        <p className="mt-2 text-muted">
-          Accepted sessions ready to enter — each one is already tied to you or a kid.
-        </p>
-        <div className="mt-8">
-          <JoinClassPicker />
+    <div className="animate-rise space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div>
+          <Link
+            to="/sessions"
+            className="text-sm font-medium text-brand-700 hover:text-brand-800"
+          >
+            ← All sessions
+          </Link>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+            Join a class
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Upcoming sessions and time left. Join opens 15 minutes before class.
+          </p>
         </div>
-        <div className="mt-6">
-          <ButtonLink to="/sessions" variant="secondary" className="w-full">
-            View all sessions
-          </ButtonLink>
-        </div>
+        <Link
+          to="/sessions"
+          className="text-sm font-semibold text-brand-700 hover:text-brand-800"
+        >
+          View all sessions →
+        </Link>
       </div>
+
+      <JoinClassPicker />
     </div>
   )
 }

@@ -19,6 +19,7 @@ import {
 } from '../types'
 import { ButtonLink } from '../components/Button'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { MobileSessions } from '../components/sessions/MobileSessions'
 import { PaymentPill, StatusPill } from '../components/StatusPill'
 import {
   formatPaidThroughDate,
@@ -131,197 +132,212 @@ export function SessionsPage() {
 
   const groups = useMemo(() => groupSessionsByDay(filtered), [filtered])
 
+  function openEnd(engagementId: string, teacherName: string) {
+    setConfirm({ kind: 'end', engagementId, teacherName })
+  }
+
+  function openNotHire(engagementId: string, teacherName: string) {
+    setConfirm({ kind: 'not_hire', engagementId, teacherName })
+  }
+
   return (
-    <div className="space-y-6 animate-rise">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
-            Sessions
-          </h1>
-          <p className="mt-2 text-muted">
-            Timeline with teachers you’ve hired — about two months ahead. Hire someone new from
-            Learn.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink to="/sessions/join" variant="secondary">
-            Join a class
-          </ButtonLink>
-          <ButtonLink to="/learn" variant="secondary">
-            Hire a teacher
-          </ButtonLink>
-        </div>
-      </div>
+    <>
+      <MobileSessions
+        justRequested={justRequested}
+        yourTeachers={yourTeachers}
+        notHired={notHired}
+        allSessions={all}
+        filterId={filterId}
+        learners={learners}
+        groups={groups}
+        onSetLearner={(id) => (id ? setParams({ learner: id }) : setParams({}))}
+        onEnd={openEnd}
+        onNotHire={openNotHire}
+      />
 
-      {justRequested ? (
-        <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-          Request sent. Your teacher will review it — check here and notifications when they
-          respond.
-        </div>
-      ) : null}
-
-      {yourTeachers.length > 0 ? (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
-            Your teachers
-          </h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            {yourTeachers.map((eng) => (
-              <TeacherEngagementCard
-                key={eng.id}
-                eng={eng}
-                sessions={all}
-                onEnd={() => {
-                  const teacher = getTeacher(eng.teacherId)
-                  setConfirm({
-                    kind: 'end',
-                    engagementId: eng.id,
-                    teacherName: teacher?.name ?? 'this teacher',
-                  })
-                }}
-                onNotHire={() => {
-                  const teacher = getTeacher(eng.teacherId)
-                  setConfirm({
-                    kind: 'not_hire',
-                    engagementId: eng.id,
-                    teacherName: teacher?.name ?? 'this teacher',
-                  })
-                }}
-              />
-            ))}
+      <div className="hidden space-y-6 animate-rise lg:block">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+              Sessions
+            </h1>
+            <p className="mt-2 text-muted">
+              Timeline with teachers you’ve hired — about two months ahead. Hire someone new from
+              Learn.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink to="/sessions/join" variant="secondary">
+              Join a class
+            </ButtonLink>
+            <ButtonLink to="/learn" variant="secondary">
+              Hire a teacher
+            </ButtonLink>
           </div>
         </div>
-      ) : null}
 
-      {notHired.length > 0 ? (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
-            Not hired
-          </h2>
-          <p className="text-sm text-muted">
-            Teachers you chose not to continue with after the intro. You can still find them on
-            Learn if you change your mind.
-          </p>
-          <div className="grid gap-3 md:grid-cols-2">
-            {notHired.map((eng) => {
-              const teacher = getTeacher(eng.teacherId)
-              if (!teacher) return null
-              return (
-                <div
+        {justRequested ? (
+          <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+            Request sent. Your teacher will review it — check here and notifications when they
+            respond.
+          </div>
+        ) : null}
+
+        {yourTeachers.length > 0 ? (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
+              Your teachers
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {yourTeachers.map((eng) => (
+                <TeacherEngagementCard
                   key={eng.id}
-                  className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="font-semibold text-ink">{teacher.name}</p>
-                    <p className="text-sm text-muted">
-                      {SUBJECT_LABELS[eng.subject]} · {ENGAGEMENT_STATUS_LABELS[eng.status]} ·{' '}
-                      {learnerNames(eng.learnerIds)}
-                    </p>
-                  </div>
-                  <ButtonLink to={`/learn/${teacher.id}`} variant="secondary">
-                    View on Learn
-                  </ButtonLink>
-                </div>
-              )
-            })}
+                  eng={eng}
+                  sessions={all}
+                  onEnd={() => {
+                    const teacher = getTeacher(eng.teacherId)
+                    openEnd(eng.id, teacher?.name ?? 'this teacher')
+                  }}
+                  onNotHire={() => {
+                    const teacher = getTeacher(eng.teacherId)
+                    openNotHire(eng.id, teacher?.name ?? 'this teacher')
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <FilterChip
-          active={filterId === 'all'}
-          onClick={() => setParams({})}
-          label="Everyone"
-        />
-        {learners.map((l) => (
+        {notHired.length > 0 ? (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
+              Not hired
+            </h2>
+            <p className="text-sm text-muted">
+              Teachers you chose not to continue with after the intro. You can still find them on
+              Learn if you change your mind.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              {notHired.map((eng) => {
+                const teacher = getTeacher(eng.teacherId)
+                if (!teacher) return null
+                return (
+                  <div
+                    key={eng.id}
+                    className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-ink">{teacher.name}</p>
+                      <p className="text-sm text-muted">
+                        {SUBJECT_LABELS[eng.subject]} · {ENGAGEMENT_STATUS_LABELS[eng.status]} ·{' '}
+                        {learnerNames(eng.learnerIds)}
+                      </p>
+                    </div>
+                    <ButtonLink to={`/learn/${teacher.id}`} variant="secondary">
+                      View on Learn
+                    </ButtonLink>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
           <FilterChip
-            key={l.id}
-            active={filterId === l.id}
-            onClick={() => setParams({ learner: l.id })}
-            label={l.kind === 'self' ? 'You' : l.name.split(' ')[0]}
-            color={l.avatarColor}
+            active={filterId === 'all'}
+            onClick={() => setParams({})}
+            label="Everyone"
           />
-        ))}
-      </div>
-
-      {groups.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-canvas/70 px-5 py-10 text-center">
-          <p className="font-semibold text-ink">No sessions yet</p>
-          <p className="mt-1 text-sm text-muted">
-            Hire a teacher from Learn to get started.
-          </p>
-          <ButtonLink to="/learn" className="mt-4">
-            Go to Learn
-          </ButtonLink>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {groups.map((group) => (
-            <section key={group.key} className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
-                {group.label}
-              </h2>
-              <div className="space-y-3">
-                {group.sessions.map((session) => {
-                  const teacher = getTeacher(session.teacherId)
-                  if (!teacher) return null
-                  const hw = homeworkMeta(session)
-                  const eng = getEngagement(session.engagementId)
-                  return (
-                    <Link
-                      key={session.id}
-                      to={`/sessions/${session.id}`}
-                      className="flex flex-col gap-3 panel p-4 transition hover:bg-brand-50/50 hover:outline-brand-200 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div
-                          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-sm font-semibold text-white"
-                          style={{ background: teacher.avatarColor }}
-                        >
-                          {teacher.initials}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-ink">{session.title}</p>
-                          <p className="text-sm text-muted">
-                            {teacher.name} · {learnerNames(session.learnerIds)} ·{' '}
-                            {formatSessionTime(session.startsAt)} · {session.durationMinutes}{' '}
-                            min
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            <PaymentPill status={session.paymentStatus} />
-                            {hw ? (
-                              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-800">
-                                {hw}
-                              </span>
-                            ) : null}
-                            {session.sharedNotes ? (
-                              <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted ring-1 ring-line">
-                                Notes
-                              </span>
-                            ) : null}
-                            {session.transcript?.length ? (
-                              <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted ring-1 ring-line">
-                                Transcript
-                              </span>
-                            ) : null}
-                            {eng?.status === 'pending' ? (
-                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-                                Request pending
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                      <StatusPill status={session.status} />
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
+          {learners.map((l) => (
+            <FilterChip
+              key={l.id}
+              active={filterId === l.id}
+              onClick={() => setParams({ learner: l.id })}
+              label={l.kind === 'self' ? 'You' : l.name.split(' ')[0]}
+              color={l.avatarColor}
+            />
           ))}
         </div>
-      )}
+
+        {groups.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line bg-canvas/70 px-5 py-10 text-center">
+            <p className="font-semibold text-ink">No sessions yet</p>
+            <p className="mt-1 text-sm text-muted">
+              Hire a teacher from Learn to get started.
+            </p>
+            <ButtonLink to="/learn" className="mt-4">
+              Go to Learn
+            </ButtonLink>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {groups.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">
+                  {group.label}
+                </h2>
+                <div className="space-y-3">
+                  {group.sessions.map((session) => {
+                    const teacher = getTeacher(session.teacherId)
+                    if (!teacher) return null
+                    const hw = homeworkMeta(session)
+                    const eng = getEngagement(session.engagementId)
+                    return (
+                      <Link
+                        key={session.id}
+                        to={`/sessions/${session.id}`}
+                        className="flex flex-col gap-3 panel p-4 transition hover:bg-brand-50/50 hover:outline-brand-200 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-sm font-semibold text-white"
+                            style={{ background: teacher.avatarColor }}
+                          >
+                            {teacher.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-ink">{session.title}</p>
+                            <p className="text-sm text-muted">
+                              {teacher.name} · {learnerNames(session.learnerIds)} ·{' '}
+                              {formatSessionTime(session.startsAt)} · {session.durationMinutes}{' '}
+                              min
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <PaymentPill status={session.paymentStatus} />
+                              {hw ? (
+                                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-800">
+                                  {hw}
+                                </span>
+                              ) : null}
+                              {session.sharedNotes ? (
+                                <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted ring-1 ring-line">
+                                  Notes
+                                </span>
+                              ) : null}
+                              {session.transcript?.length ? (
+                                <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted ring-1 ring-line">
+                                  Transcript
+                                </span>
+                              ) : null}
+                              {eng?.status === 'pending' ? (
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                                  Request pending
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                        <StatusPill status={session.status} />
+                      </Link>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
 
       <ConfirmModal
         open={Boolean(confirm)}
@@ -345,7 +361,7 @@ export function SessionsPage() {
           setConfirm(null)
         }}
       />
-    </div>
+    </>
   )
 }
 

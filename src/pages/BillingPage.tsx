@@ -3,6 +3,7 @@ import { getTeacher, useInvoices } from '../mocks/store'
 import { INVOICE_STATUS_LABELS } from '../types'
 import { ButtonLink } from '../components/Button'
 import { formatAskDate } from '../lib/format'
+import { useCurrency } from '../context/CurrencyContext'
 
 export function BillingPage() {
   const invoices = [...useInvoices()].sort((a, b) =>
@@ -66,6 +67,7 @@ export function BillingPage() {
 }
 
 function InvoiceRow({ invoiceId }: { invoiceId: string }) {
+  const { formatUsd } = useCurrency()
   const invoices = useInvoices()
   const inv = invoices.find((i) => i.id === invoiceId)
   if (!inv) return null
@@ -89,7 +91,7 @@ function InvoiceRow({ invoiceId }: { invoiceId: string }) {
             {formatAskDate(inv.createdAt)}
           </p>
         </div>
-        <p className="text-lg font-extrabold text-ink">${inv.totalUsd}</p>
+        <p className="text-lg font-extrabold text-ink">{formatUsd(inv.totalUsd)}</p>
       </Link>
     </li>
   )

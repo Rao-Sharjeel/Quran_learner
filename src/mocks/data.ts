@@ -162,9 +162,14 @@ export const teachers: Teacher[] = [
     avatarColor: '#0f766e',
     initials: 'YH',
     availability: [
-      { id: 's1', weekday: 4, startTime: '19:00', label: 'Thu 7:00 PM' },
+      { id: 's1', weekday: 4, startTime: '09:00', label: 'Thu 9:00 AM' },
+      { id: 's1b', weekday: 4, startTime: '14:00', label: 'Thu 2:00 PM' },
+      { id: 's1c', weekday: 4, startTime: '19:00', label: 'Thu 7:00 PM' },
       { id: 's2', weekday: 6, startTime: '10:00', label: 'Sat 10:00 AM' },
-      { id: 's3', weekday: 0, startTime: '16:00', label: 'Sun 4:00 PM' },
+      { id: 's2b', weekday: 6, startTime: '16:00', label: 'Sat 4:00 PM' },
+      { id: 's3', weekday: 0, startTime: '11:00', label: 'Sun 11:00 AM' },
+      { id: 's3b', weekday: 0, startTime: '16:00', label: 'Sun 4:00 PM' },
+      { id: 's3c', weekday: 0, startTime: '20:00', label: 'Sun 8:00 PM' },
     ],
   },
   {
@@ -183,8 +188,11 @@ export const teachers: Teacher[] = [
     avatarColor: '#0369a1',
     initials: 'MS',
     availability: [
-      { id: 's4', weekday: 5, startTime: '18:30', label: 'Fri 6:30 PM' },
-      { id: 's5', weekday: 1, startTime: '20:00', label: 'Mon 8:00 PM' },
+      { id: 's4', weekday: 5, startTime: '10:00', label: 'Fri 10:00 AM' },
+      { id: 's4b', weekday: 5, startTime: '18:30', label: 'Fri 6:30 PM' },
+      { id: 's5', weekday: 1, startTime: '09:30', label: 'Mon 9:30 AM' },
+      { id: 's5b', weekday: 1, startTime: '15:00', label: 'Mon 3:00 PM' },
+      { id: 's5c', weekday: 1, startTime: '20:00', label: 'Mon 8:00 PM' },
     ],
   },
   {
@@ -203,8 +211,11 @@ export const teachers: Teacher[] = [
     avatarColor: '#b45309',
     initials: 'IN',
     availability: [
-      { id: 's6', weekday: 3, startTime: '21:00', label: 'Wed 9:00 PM' },
-      { id: 's7', weekday: 6, startTime: '14:00', label: 'Sat 2:00 PM' },
+      { id: 's6', weekday: 3, startTime: '10:00', label: 'Wed 10:00 AM' },
+      { id: 's6b', weekday: 3, startTime: '21:00', label: 'Wed 9:00 PM' },
+      { id: 's7', weekday: 6, startTime: '09:00', label: 'Sat 9:00 AM' },
+      { id: 's7b', weekday: 6, startTime: '14:00', label: 'Sat 2:00 PM' },
+      { id: 's7c', weekday: 6, startTime: '18:00', label: 'Sat 6:00 PM' },
     ],
   },
   {
@@ -223,8 +234,10 @@ export const teachers: Teacher[] = [
     avatarColor: '#4f46e5',
     initials: 'BK',
     availability: [
-      { id: 's8', weekday: 2, startTime: '19:30', label: 'Tue 7:30 PM' },
-      { id: 's9', weekday: 4, startTime: '20:00', label: 'Thu 8:00 PM' },
+      { id: 's8', weekday: 2, startTime: '12:00', label: 'Tue 12:00 PM' },
+      { id: 's8b', weekday: 2, startTime: '19:30', label: 'Tue 7:30 PM' },
+      { id: 's9', weekday: 4, startTime: '08:00', label: 'Thu 8:00 AM' },
+      { id: 's9b', weekday: 4, startTime: '20:00', label: 'Thu 8:00 PM' },
     ],
   },
   {
@@ -244,7 +257,10 @@ export const teachers: Teacher[] = [
     initials: 'FN',
     availability: [
       { id: 's10', weekday: 0, startTime: '11:00', label: 'Sun 11:00 AM' },
-      { id: 's11', weekday: 3, startTime: '17:00', label: 'Wed 5:00 PM' },
+      { id: 's10b', weekday: 0, startTime: '15:30', label: 'Sun 3:30 PM' },
+      { id: 's10c', weekday: 0, startTime: '19:00', label: 'Sun 7:00 PM' },
+      { id: 's11', weekday: 3, startTime: '10:00', label: 'Wed 10:00 AM' },
+      { id: 's11b', weekday: 3, startTime: '17:00', label: 'Wed 5:00 PM' },
     ],
   },
   {
@@ -263,8 +279,10 @@ export const teachers: Teacher[] = [
     avatarColor: '#15803d',
     initials: 'OF',
     availability: [
-      { id: 's12', weekday: 6, startTime: '20:00', label: 'Sat 8:00 PM' },
-      { id: 's13', weekday: 1, startTime: '21:00', label: 'Mon 9:00 PM' },
+      { id: 's12', weekday: 6, startTime: '11:00', label: 'Sat 11:00 AM' },
+      { id: 's12b', weekday: 6, startTime: '20:00', label: 'Sat 8:00 PM' },
+      { id: 's13', weekday: 1, startTime: '14:00', label: 'Mon 2:00 PM' },
+      { id: 's13b', weekday: 1, startTime: '21:00', label: 'Mon 9:00 PM' },
     ],
   },
 ]

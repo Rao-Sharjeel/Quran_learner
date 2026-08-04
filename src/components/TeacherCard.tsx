@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Teacher } from '../types'
 import { SUBJECT_LABELS } from '../types'
+import { useCurrency } from '../context/CurrencyContext'
 import { BadgePill } from './BadgePill'
 
 export function TeacherCard({
@@ -10,6 +11,7 @@ export function TeacherCard({
   teacher: Teacher
   forLearnerId?: string
 }) {
+  const { formatUsd } = useCurrency()
   const to = forLearnerId
     ? `/learn/${teacher.id}?for=${forLearnerId}`
     : `/learn/${teacher.id}`
@@ -54,7 +56,9 @@ export function TeacherCard({
         <span className="text-muted">
           ★ {teacher.rating.toFixed(1)} · {teacher.durationMinutes} min
         </span>
-        <span className="font-semibold text-ink">${teacher.rateUsd}/session</span>
+        <span className="font-semibold text-ink">
+          {formatUsd(teacher.rateUsd)}/session
+        </span>
       </div>
     </Link>
   )

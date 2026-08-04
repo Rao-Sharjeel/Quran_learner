@@ -13,6 +13,7 @@ import { JoinSessionPage } from './pages/JoinSessionPage'
 import { HomeworkAudioPage } from './pages/HomeworkAudioPage'
 import { HomeworkPage } from './pages/HomeworkPage'
 import { InvoiceDetailPage } from './pages/InvoiceDetailPage'
+import { EditProfilePage } from './pages/EditProfilePage'
 import { KidEditPage } from './pages/KidEditPage'
 import { KidHubPage } from './pages/KidHubPage'
 import { KidNewPage } from './pages/KidNewPage'
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/kids/new" element={<KidNewPage />} />
         <Route path="/kids/:id" element={<KidHubPage />} />
         <Route path="/kids/:id/edit" element={<KidEditPage />} />
+        <Route path="/profile/edit" element={<EditProfilePage />} />
         <Route path="/learn" element={<TeachersPage />} />
         <Route path="/learn/:id" element={<TeacherProfilePage />} />
         <Route path="/learn/:id/hire" element={<BookSessionPage />} />

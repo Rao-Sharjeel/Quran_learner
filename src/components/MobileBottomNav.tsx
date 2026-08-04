@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { CurrencySelector } from './CurrencySelector'
 
 const primaryTabs = [
   { to: '/app', label: 'Home', end: true, icon: 'home' },
@@ -11,6 +12,7 @@ const primaryTabs = [
 const moreLinks = [
   { to: '/learn', label: 'Learn' },
   { to: '/billing', label: 'Billing' },
+  { to: '/profile/edit', label: 'Edit profile' },
   { to: '/homework', label: 'Homework' },
   { to: '/library', label: 'Read' },
 ] as const
@@ -116,6 +118,10 @@ export function MobileBottomNav() {
           role="menu"
           className="mx-3 mb-2 overflow-hidden rounded-2xl bg-canvas shadow-lg shadow-brand-800/15 outline outline-1 outline-line"
         >
+          <div className="flex items-center justify-between gap-2 border-b border-line/70 px-4 py-3">
+            <span className="text-sm font-semibold text-ink">Currency</span>
+            <CurrencySelector size="sm" />
+          </div>
           {moreLinks.map((link) => (
             <NavLink
               key={link.to}

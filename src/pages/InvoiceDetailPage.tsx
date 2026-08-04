@@ -3,9 +3,11 @@ import { getEngagement, getTeacher, useInvoice } from '../mocks/store'
 import { INVOICE_STATUS_LABELS, SUBJECT_LABELS } from '../types'
 import { ButtonLink } from '../components/Button'
 import { formatAskDate } from '../lib/format'
+import { useCurrency } from '../context/CurrencyContext'
 
 export function InvoiceDetailPage() {
   const { id } = useParams()
+  const { formatUsd } = useCurrency()
   const invoice = useInvoice(id)
   const teacher = invoice ? getTeacher(invoice.teacherId) : undefined
   const engagement = invoice ? getEngagement(invoice.engagementId) : undefined
@@ -63,11 +65,11 @@ export function InvoiceDetailPage() {
               <div>
                 <p className="font-medium text-ink">{line.description}</p>
                 <p className="text-muted">
-                  {line.quantity} × ${line.unitAmountUsd}
+                  {line.quantity} × {formatUsd(line.unitAmountUsd)}
                 </p>
               </div>
               <p className="font-semibold text-ink">
-                ${line.quantity * line.unitAmountUsd}
+                {formatUsd(line.quantity * line.unitAmountUsd)}
               </p>
             </li>
           ))}
@@ -75,11 +77,13 @@ export function InvoiceDetailPage() {
 
         <div className="flex justify-between border-t border-line pt-4 text-sm">
           <span className="text-muted">Subtotal</span>
-          <span className="font-semibold">${invoice.subtotalUsd}</span>
+          <span className="font-semibold">{formatUsd(invoice.subtotalUsd)}</span>
         </div>
         <div className="flex justify-between text-base">
           <span className="font-bold text-ink">Total</span>
-          <span className="text-2xl font-extrabold text-ink">${invoice.totalUsd}</span>
+          <span className="text-2xl font-extrabold text-ink">
+            {formatUsd(invoice.totalUsd)}
+          </span>
         </div>
 
         {invoice.status === 'paid' ? (

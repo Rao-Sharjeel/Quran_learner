@@ -16,6 +16,7 @@ import {
 } from '../types'
 import { Button, ButtonLink } from '../components/Button'
 import { MultiLearnerPicker } from '../components/MultiLearnerPicker'
+import { useCurrency } from '../context/CurrencyContext'
 
 const fieldClass =
   'w-full rounded-2xl bg-surface px-3.5 py-2.5 text-sm outline-none ring-1 ring-line transition focus:bg-canvas focus:ring-2 focus:ring-brand-500/30'
@@ -24,6 +25,7 @@ export function BookSessionPage() {
   const { id } = useParams()
   const [search] = useSearchParams()
   const navigate = useNavigate()
+  const { formatUsd } = useCurrency()
   const teacher = id ? getTeacher(id) : undefined
   const learners = useLearners()
   const preselect = search.get('for')
@@ -53,6 +55,7 @@ export function BookSessionPage() {
 
   const introAvailable = !hadFreeIntro(getGuardian().id, teacher.id)
   const slotsSorted = [...teacher.availability].sort((a, b) => a.weekday - b.weekday)
+  const packageFrom = formatUsd(teacher.rateUsd * PACKAGE_SESSION_COUNT)
 
   function toggleSlot(slotId: string) {
     setSlotIds((prev) =>
@@ -94,7 +97,7 @@ export function BookSessionPage() {
           Request sessions
         </h1>
         <p className="mt-2 text-muted">
-          ${teacher.rateUsd}/session · {teacher.durationMinutes} min regular ·{' '}
+          {formatUsd(teacher.rateUsd)}/session · {teacher.durationMinutes} min regular ·{' '}
           {introAvailable
             ? `free ${INTRO_DURATION_MINUTES}-min intro first`
             : 'no free intro (you’ve studied with this teacher before)'}
@@ -197,8 +200,8 @@ export function BookSessionPage() {
           <p>
             After accept:{' '}
             {introAvailable
-              ? `free intro → then pay for at least ${PACKAGE_SESSION_COUNT} sessions (from $${teacher.rateUsd * PACKAGE_SESSION_COUNT}).`
-              : `pay for at least ${PACKAGE_SESSION_COUNT} sessions (from $${teacher.rateUsd * PACKAGE_SESSION_COUNT}) — no free intro.`}
+              ? `free intro → then pay for at least ${PACKAGE_SESSION_COUNT} sessions (from ${packageFrom}).`
+              : `pay for at least ${PACKAGE_SESSION_COUNT} sessions (from ${packageFrom}) — no free intro.`}
           </p>
         </div>
 

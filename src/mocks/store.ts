@@ -3,6 +3,7 @@ import type {
   AppNotification,
   AskQuestion,
   Course,
+  GuardianProfile,
   HomeworkAudioComment,
   HomeworkItem,
   Invoice,
@@ -20,7 +21,6 @@ import {
 } from '../types'
 import {
   currentGuardian,
-  currentStudent,
   learnerInitials,
   nextLearnerColor,
   seedAskQuestions,
@@ -39,6 +39,7 @@ import {
   hadFreeIntroForPair,
   slotsForEngagement,
 } from './engagementHelpers'
+import { isSessionJoinOpen, isSessionStillJoinRelevant } from '../lib/sessionJoin'
 import { nextOccurrence } from '../lib/schedule'
 import { seedLibrary } from './library'
 
@@ -50,6 +51,7 @@ let invoices: Invoice[] = structuredClone(seedInvoices)
 let askQuestions: AskQuestion[] = structuredClone(seedAskQuestions)
 let learners: LearnerProfile[] = structuredClone(seedLearners)
 let readingBookmarks: ReadingBookmark[] = structuredClone(seedReadingBookmarks)
+let guardian: GuardianProfile = structuredClone(currentGuardian)
 let notifications: AppNotification[] = [
   {
     id: 'ntf_seed_1',
@@ -95,6 +97,10 @@ function getNotificationsSnapshot() {
 
 function getAskQuestions() {
   return askQuestions
+}
+
+function getGuardianSnapshot() {
+  return guardian
 }
 
 function getLearnersSnapshot() {
@@ -202,12 +208,36 @@ export function listForumScholars() {
 }
 
 export function getGuardian() {
-  return currentGuardian
+  return guardian
 }
 
 /** @deprecated Prefer getGuardian */
 export function getStudent() {
-  return currentStudent
+  return guardian
+}
+
+export function updateGuardian(patch: { name?: string; email?: string }) {
+  const name = patch.name !== undefined ? patch.name.trim() : guardian.name
+  const email = patch.email !== undefined ? patch.email.trim() : guardian.email
+  if (!name) throw new Error('Name is required')
+  if (!email) throw new Error('Email is required')
+
+  guardian = { ...guardian, name, email }
+
+  const self = learners.find((l) => l.kind === 'self')
+  if (self && self.name !== name) {
+    learners = learners.map((l) =>
+      l.kind === 'self'
+        ? { ...l, name, initials: learnerInitials(name) }
+        : l,
+    )
+  }
+  emit()
+  return guardian
+}
+
+export function useGuardian() {
+  return useSyncExternalStore(subscribe, getGuardianSnapshot, getGuardianSnapshot)
 }
 
 export function getLearners() {
@@ -236,7 +266,7 @@ export function addKid(input: { name: string; age?: number }) {
   if (!name) throw new Error('Name is required')
   const kid: LearnerProfile = {
     id: `kid_${Date.now()}`,
-    guardianId: currentGuardian.id,
+    guardianId: guardian.id,
     kind: 'kid',
     name,
     age: input.age,
@@ -471,10 +501,10 @@ export function createEngagementRequest(input: {
     if (!learners.some((l) => l.id === lid)) throw new Error('Invalid learner')
   }
 
-  const introUsed = hadFreeIntro(currentGuardian.id, teacher.id)
+  const introUsed = hadFreeIntro(guardian.id, teacher.id)
   const engagement: TeachingEngagement = {
     id: `eng_${Date.now()}`,
-    guardianId: currentGuardian.id,
+    guardianId: guardian.id,
     teacherId: teacher.id,
     subject: input.subject,
     learnerIds: [...input.learnerIds],
@@ -1079,14 +1109,24 @@ export function underReviewAskCount(learnerId: string) {
   ).length
 }
 
-/** Joinable: scheduled + (free or paid) — unpaid cannot join until paid */
-export function joinableSessions() {
+function isPaidOrFreeScheduled(s: (typeof sessions)[number]) {
+  return (
+    s.status === 'scheduled' &&
+    (s.paymentStatus === 'paid' || s.paymentStatus === 'free')
+  )
+}
+
+/** Joinable now: scheduled + paid/free + inside the join window (15m before → grace after end). */
+export function joinableSessions(now = new Date()) {
   return sessions
-    .filter(
-      (s) =>
-        s.status === 'scheduled' &&
-        (s.paymentStatus === 'paid' || s.paymentStatus === 'free'),
-    )
+    .filter((s) => isPaidOrFreeScheduled(s) && isSessionJoinOpen(s, now))
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+}
+
+/** Upcoming (and live) paid/free classes for the Join page — includes countdowns. */
+export function upcomingJoinSessions(now = new Date()) {
+  return sessions
+    .filter((s) => isPaidOrFreeScheduled(s) && isSessionStillJoinRelevant(s, now))
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
 }
 
@@ -1300,7 +1340,7 @@ export function replyToClarification(
     throw new Error('This question is not open for replies.')
   }
   const learner = getLearner(question.studentId)
-  if (!learner || learner.guardianId !== currentGuardian.id) {
+  if (!learner || learner.guardianId !== guardian.id) {
     throw new Error('Only this family’s guardian can reply to clarifications.')
   }
   const item = question.clarifications.find((c) => c.id === clarificationId)

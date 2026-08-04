@@ -1,12 +1,15 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getTeacher, listReviewsForTeacher } from '../mocks/store'
-import { SUBJECT_LABELS, WEEKDAY_LABELS } from '../types'
+import { SUBJECT_LABELS } from '../types'
 import { BadgePill } from '../components/BadgePill'
 import { ButtonLink } from '../components/Button'
+import { WeeklyAvailabilityCalendar } from '../components/WeeklyAvailabilityCalendar'
+import { useCurrency } from '../context/CurrencyContext'
 
 export function TeacherProfilePage() {
   const { id } = useParams()
   const [search] = useSearchParams()
+  const { formatUsd } = useCurrency()
   const forId = search.get('for')
   const hireTo = forId ? `/learn/${id}/hire?for=${forId}` : `/learn/${id}/hire`
   const teacher = id ? getTeacher(id) : undefined
@@ -22,8 +25,6 @@ export function TeacherProfilePage() {
       </div>
     )
   }
-
-  const byWeekday = [...teacher.availability].sort((a, b) => a.weekday - b.weekday)
 
   return (
     <div className="space-y-6 animate-rise">
@@ -58,7 +59,7 @@ export function TeacherProfilePage() {
               </span>
               <span className="text-muted">{teacher.languages.join(' · ')}</span>
               <span className="font-semibold">
-                ${teacher.rateUsd}/session · {teacher.durationMinutes} min
+                {formatUsd(teacher.rateUsd)}/session · {teacher.durationMinutes} min
               </span>
             </div>
           </div>
@@ -67,8 +68,8 @@ export function TeacherProfilePage() {
           </ButtonLink>
         </div>
 
-        <div className="mt-8 grid gap-8 border-t border-line pt-8 md:grid-cols-3">
-          <div className="space-y-4 md:col-span-2">
+        <div className="mt-8 grid gap-8 border-t border-line pt-8 lg:grid-cols-5">
+          <div className="space-y-4 lg:col-span-3">
             <h2 className="text-xl font-bold tracking-tight">About</h2>
             <p className="leading-relaxed text-muted">{teacher.bio}</p>
             <h2 className="pt-2 text-xl font-bold tracking-tight">Subjects</h2>
@@ -103,24 +104,12 @@ export function TeacherProfilePage() {
             )}
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">Weekly availability</h2>
-            <p className="mt-1 text-xs text-muted">
-              Recurring spots · {teacher.timezone}
-            </p>
-            <ul className="mt-3 space-y-2">
-              {byWeekday.map((slot) => (
-                <li
-                  key={slot.id}
-                  className="rounded-xl border border-line px-3 py-2.5 text-sm"
-                >
-                  <span className="font-semibold text-ink">
-                    {WEEKDAY_LABELS[slot.weekday]}
-                  </span>{' '}
-                  <span className="text-muted">{slot.label.replace(/^\w+\s/, '')}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="lg:col-span-2">
+            <WeeklyAvailabilityCalendar
+              slots={teacher.availability}
+              durationMinutes={teacher.durationMinutes}
+              timezone={teacher.timezone}
+            />
             <ButtonLink to={hireTo} variant="secondary" className="mt-4 w-full">
               Pick times & send request
             </ButtonLink>
